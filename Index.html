@@ -331,6 +331,27 @@ table.lb .rank{ display:inline-flex; width:20px; height:20px; border-radius:6px;
 table.lb .conv{ font-weight:600; }
 table.lb .conv.high{ color:var(--success-text); }
 table.lb .conv.mid{ color:#95650a; }
+
+/* Tren Tambah Daya (dashboard) */
+.trend-wrap{ position:relative; }
+.trend-svg{ width:100%; height:auto; display:block; overflow:visible; }
+.trend-svg .trend-gridline{ stroke:var(--grid); stroke-width:1; }
+.trend-svg .trend-axis-label{ fill:var(--text-muted); font-size:9.5px; font-weight:600; }
+.trend-svg .trend-area{ fill:rgba(0,50,90,.08); }
+.trend-svg .trend-line{ fill:none; stroke:var(--pln-navy); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+.trend-svg .trend-dot{ fill:#fff; stroke:var(--pln-navy); stroke-width:2; }
+.trend-svg .trend-hit{ fill:transparent; cursor:pointer; }
+.trend-svg .trend-crosshair{ stroke:var(--pln-navy); stroke-width:1; stroke-dasharray:3,3; opacity:0; pointer-events:none; }
+.trend-svg .trend-value-label{ font-size:10.5px; font-weight:700; fill:var(--pln-navy); }
+.trend-tooltip{ position:absolute; pointer-events:none; background:var(--pln-navy); color:#fff; font-size:11px; line-height:1.5; padding:7px 10px; border-radius:8px; box-shadow:var(--shadow-sm); white-space:nowrap; opacity:0; transform:translate(-50%,-100%); transition:opacity .1s; z-index:5; }
+.trend-tooltip b{ font-size:12px; }
+.trend-table-toggle{ background:none; border:none; color:var(--pln-navy); font-size:11.5px; font-weight:600; text-decoration:underline; cursor:pointer; padding:0; margin-top:10px; }
+table.trend-table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+table.trend-table th{ text-align:right; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:600; padding:0 0 8px; border-bottom:1px solid var(--grid); }
+table.trend-table th:first-child, table.trend-table td:first-child{ text-align:left; }
+table.trend-table td{ text-align:right; padding:8px 0; border-bottom:1px solid var(--grid); }
+table.trend-table tr:last-child td{ border-bottom:none; }
+
 @media (min-width:720px){
   .stat-tiles{ grid-template-columns:repeat(3,1fr); }
 }
@@ -563,6 +584,11 @@ table.lb .conv.mid{ color:#95650a; }
       </div>
     </div>
     <div class="card">
+      <h4 style="margin:0 0 4px;">Tren Tambah Daya</h4>
+      <div class="route-note" style="margin-bottom:12px;">Realisasi tambah daya (kumulatif per bulan, dari tanggal kunjungan yang dicatat petugas)</div>
+      <div id="dashTrend"></div>
+    </div>
+    <div class="card">
       <h4 style="margin:0 0 4px;">Papan Kinerja Petugas</h4>
       <div class="route-note" style="margin-bottom:12px;">Dihitung dari akun yang mencatat hasil kunjungan (bukan dari kolom Petugas di data pelanggan) — diurutkan berdasarkan tingkat konversi (Realisasi ÷ Target yang sudah dicatat)</div>
       <div id="dashLeaderboard"></div>
@@ -633,12 +659,13 @@ let prospekSheetMissing = false; // true kalau spreadsheet belum punya tab "Pros
 let digitalSubtab = 'wa';
 
 // Nama tab disesuaikan persis dengan nama tab di Google Sheets master data sungguhan
-// milik PLN ULP Nabire Kota (bukan nama generik "Pascabayar"/"Prabayar" seperti versi
-// template awal) — supaya tidak perlu mengganti nama tab di spreadsheet asli.
+// milik PLN ULP Nabire Kota (dikonfirmasi langsung dari tab spreadsheet asli: "Paskabayar"
+// dan "Prabayar" — bukan "Data Pemakaian"/"Data Pemakaian Prabayar" dari nama sheet di file
+// Excel sumbernya, dan bukan pula "Pascabayar"/"Prabayar" generik dari versi template awal).
 const SHEET_NAMES = {
   identitas: 'Data Identitas',
-  pasca: 'Data Pemakaian',
-  pra: 'Data Pemakaian Prabayar',
+  pasca: 'Paskabayar',
+  pra: 'Prabayar',
   batal: 'Batal Permohonan Tambah Daya',
   progres: 'Progres Probing',
   updateDaya: 'Update Daya',
@@ -2074,6 +2101,119 @@ function parseRupiah(v){
 function formatRupiah(n){
   return 'Rp '+Math.round(n).toLocaleString('id-ID');
 }
+
+/* Tren Tambah Daya: Realisasi (kumulatif per bulan, dari tanggal kunjungan yang
+   dicatat petugas di "Tanggal Update Terakhir"). Pelanggan selesai yang tidak
+   punya tanggal valid (mis. data lama hasil impor) dikelompokkan ke bucket
+   "Sebelum Tercatat" di awal grafik, supaya total kumulatifnya tetap cocok
+   dengan tile "Realisasi Tambah Daya" di atas. */
+function renderTrendChart(list){
+  const wrap = document.getElementById('dashTrend');
+  if(!wrap) return;
+  const selesaiList = list.filter(c=>c.statusKey==='selesai');
+  if(selesaiList.length===0){
+    wrap.innerHTML = '<div class="empty-note">Tren akan muncul begitu ada pelanggan yang direalisasikan (status Selesai).</div>';
+    return;
+  }
+  const byMonth = {};
+  selesaiList.forEach(c=>{
+    const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(c.daya) || c.daya;
+    const gainVA = Math.max(0, t - c.daya);
+    const d = c.tanggalUpdateTerakhir;
+    const key = (d && /^\d{4}-\d{2}-\d{2}$/.test(String(d).trim())) ? String(d).trim().slice(0,7) : '_unknown';
+    byMonth[key] = (byMonth[key]||0) + gainVA;
+  });
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const monthKeys = Object.keys(byMonth).filter(k=>k!=='_unknown').sort();
+  const points = [];
+  if(byMonth['_unknown']) points.push({ label:'Sebelum Tercatat', va:byMonth['_unknown'] });
+  monthKeys.forEach(k=>{
+    const parts = k.split('-'); const y=parts[0], m=parts[1];
+    points.push({ label:MONTH_LABELS[parseInt(m,10)-1]+' '+y.slice(2), va:byMonth[k] });
+  });
+  let cum = 0;
+  points.forEach(p=>{ cum += p.va; p.cumKVA = cum/1000; });
+  const lastKVA = points[points.length-1].cumKVA;
+  const maxVal = Math.max(lastKVA, 0.001) * 1.2;
+
+  const W=600, H=220, padL=38, padR=14, padT=18, padB=30;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const n = points.length;
+  const xAt = i=> n===1 ? padL+plotW/2 : padL + i*(plotW/(n-1));
+  const yAt = v=> padT + plotH - (v/maxVal)*plotH;
+
+  const linePts = points.map((p,i)=> xAt(i).toFixed(1)+','+yAt(p.cumKVA).toFixed(1)).join(' ');
+  const areaPts = linePts+' '+xAt(n-1).toFixed(1)+','+(padT+plotH)+' '+xAt(0).toFixed(1)+','+(padT+plotH);
+
+  const ticks = [0,0.33,0.66,1].map(f=> maxVal*f);
+  const gridSvg = ticks.map(v=>{
+    const y = yAt(v);
+    return '<line class="trend-gridline" x1="'+padL+'" x2="'+(W-padR)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'"></line>'+
+      '<text class="trend-axis-label" x="'+(padL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v.toFixed(1)+'</text>';
+  }).join('');
+  const xLabelsSvg = points.map((p,i)=>'<text class="trend-axis-label" x="'+xAt(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+escapeHtml(p.label)+'</text>').join('');
+  const dotsSvg = points.map((p,i)=>{
+    const x=xAt(i), y=yAt(p.cumKVA);
+    return '<circle class="trend-dot" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="4"></circle>'+
+      '<circle class="trend-hit" data-idx="'+i+'" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="14"></circle>';
+  }).join('');
+  const lastX = xAt(n-1), lastY = yAt(lastKVA);
+
+  wrap.innerHTML =
+    '<div class="trend-wrap">'+
+      '<svg class="trend-svg" viewBox="0 0 '+W+' '+H+'" id="trendSvg" preserveAspectRatio="xMidYMid meet">'+
+        gridSvg+
+        '<polygon class="trend-area" points="'+areaPts+'"></polygon>'+
+        '<polyline class="trend-line" points="'+linePts+'"></polyline>'+
+        '<text class="trend-value-label" x="'+lastX.toFixed(1)+'" y="'+(lastY-10).toFixed(1)+'" text-anchor="end">'+lastKVA.toFixed(1)+' kVA</text>'+
+        dotsSvg+
+        xLabelsSvg+
+        '<line class="trend-crosshair" id="trendCrosshair" x1="0" x2="0" y1="'+padT+'" y2="'+(padT+plotH)+'"></line>'+
+      '</svg>'+
+      '<div class="trend-tooltip" id="trendTooltip"></div>'+
+    '</div>'+
+    '<button class="trend-table-toggle" onclick="toggleTrendTable()" id="trendTableToggleBtn">Lihat sebagai tabel</button>'+
+    '<div id="trendTableWrap" style="display:none;">'+
+      '<table class="trend-table"><tr><th>Bulan</th><th>Realisasi (kVA)</th><th>Kumulatif (kVA)</th></tr>'+
+        points.map(p=>'<tr><td>'+escapeHtml(p.label)+'</td><td>'+(p.va/1000).toFixed(1)+'</td><td>'+p.cumKVA.toFixed(1)+'</td></tr>').join('')+
+      '</table>'+
+    '</div>';
+
+  const svgEl = document.getElementById('trendSvg');
+  const tooltipEl = document.getElementById('trendTooltip');
+  const crosshairEl = document.getElementById('trendCrosshair');
+  const wrapEl = wrap.querySelector('.trend-wrap');
+  svgEl.querySelectorAll('.trend-hit').forEach(hit=>{
+    hit.addEventListener('mouseenter', ()=>{
+      const idx = parseInt(hit.getAttribute('data-idx'),10);
+      const p = points[idx];
+      const rectWrap = wrapEl.getBoundingClientRect();
+      const rectHit = hit.getBoundingClientRect();
+      const cx = rectHit.left + rectHit.width/2 - rectWrap.left;
+      const cy = rectHit.top - rectWrap.top;
+      tooltipEl.innerHTML = '<b>'+escapeHtml(p.label)+'</b><br>Realisasi: '+(p.va/1000).toFixed(1)+' kVA<br>Kumulatif: '+p.cumKVA.toFixed(1)+' kVA';
+      tooltipEl.style.left = cx+'px';
+      tooltipEl.style.top = (cy-6)+'px';
+      tooltipEl.style.opacity = '1';
+      crosshairEl.setAttribute('x1', hit.getAttribute('cx'));
+      crosshairEl.setAttribute('x2', hit.getAttribute('cx'));
+      crosshairEl.style.opacity = '1';
+    });
+    hit.addEventListener('mouseleave', ()=>{
+      tooltipEl.style.opacity = '0';
+      crosshairEl.style.opacity = '0';
+    });
+  });
+}
+function toggleTrendTable(){
+  const w = document.getElementById('trendTableWrap');
+  const btn = document.getElementById('trendTableToggleBtn');
+  if(!w) return;
+  const show = w.style.display==='none';
+  w.style.display = show ? '' : 'none';
+  if(btn) btn.textContent = show ? 'Sembunyikan tabel' : 'Lihat sebagai tabel';
+}
+
 function renderDashboard(){
   const subEl = document.getElementById('dashSubtitle');
   const tilesEl = document.getElementById('dashTiles');
@@ -2098,6 +2238,8 @@ function renderDashboard(){
     .reduce((sum,c)=>{ const e = estimasiBiayaPenyambungan(c.daya); return e!=null ? sum+e : sum; },0);
 
   subEl.textContent = (DEMO_MODE?'Mode Demo — ':'') + total+' pelanggan target sesuai filter aktif · diperbarui otomatis dari Google Sheets';
+
+  renderTrendChart(list);
 
   tilesEl.innerHTML =
     '<div class="tile"><div class="l">Total Target</div><div class="n">'+total+'</div><div class="d">Prioritas Tinggi: '+list.filter(c=>c.priority==='tinggi').length+'</div></div>'+
