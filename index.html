@@ -1193,15 +1193,19 @@ function buildCustomersFromSheets(sheets){
     rec.dayaBulanLalu = parseInt(prev['DAYA'],10)||0;
   });
 
-  // 2) sumber Jam Nyala prabayar
+  // 2) sumber Jam Nyala prabayar — sheet "Prabayar" sekarang hanya berisi kolom
+  //    IDPEL, TARIF, DAYA, Kategori Durasi, NAMA (alamat/KDDK/koordinat sengaja
+  //    dihapus dari sheet ini oleh admin supaya spreadsheet tidak terlalu berat —
+  //    semua itu diambil dari Data Identitas saja, dicocokkan lewat IDPEL, lewat
+  //    ensureRecord()/master[] di atas). Jangan baca kolom yang sudah tidak ada.
   Object.keys(praByIdpel).forEach(idpel=>{
     if(updateDayaSet.has(idpel)) return;
     const r = praByIdpel[idpel];
-    const rec = ensureRecord(idpel, { name:r['NAMA'], addr:r['ALAMAT'], kddk:r['KDDK'] });
+    const rec = ensureRecord(idpel, { name:r['NAMA'] });
     if(!rec.jenisPelanggan) rec.jenisPelanggan = 'prabayar'; // pascabayar tidak mungkin dobel jadi prabayar
     rec.kategoriDurasi = r['Kategori Durasi']||'';
-    if(isNaN(rec.lat)) rec.lat = parseFloat(r['KOORDINAT_X']);
-    if(isNaN(rec.lng)) rec.lng = parseFloat(r['KOORDINAT_Y']);
+    rec.daya = parseInt(r['DAYA'],10)||0;
+    rec.tarif = r['TARIF']||rec.tarif||'';
   });
 
   // 3) permohonan dibatalkan
