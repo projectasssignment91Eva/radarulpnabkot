@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
@@ -211,10 +212,11 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .sheet-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .sheet-header h3{ margin:0; font-size:16px; color:var(--pln-navy); }
 .filter-group{ margin-bottom:18px; }
-.fg-label{ font-size:12.5px; font-weight:600; color:var(--text-secondary); margin-bottom:8px; }
-.chip-row{ display:flex; gap:8px; flex-wrap:wrap; }
-.chip{ border:1.5px solid var(--border); border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--text-secondary); background:#fff; }
-.chip.active{ background:var(--pln-navy); border-color:var(--pln-navy); color:#fff; }
+.fg-label{ font-size:12.5px; font-weight:700; color:var(--text-primary); margin-bottom:8px; }
+.filter-select{ width:100%; border:1.5px solid var(--border); border-radius:10px; padding:8px; font-size:13px; font-family:var(--font-ui); background:#fff; color:var(--text-primary); }
+.filter-select[multiple] option{ padding:5px 6px; border-radius:6px; }
+.filter-select[multiple] option:checked{ background:var(--pln-navy); color:#fff; }
+.fg-hint{ font-size:10.5px; color:var(--text-muted); margin-top:5px; line-height:1.4; }
 .route-note{ font-size:11px; color:var(--text-muted); margin:4px 0 0; }
 .route-info-box{ background:#eef7fc; border:1px solid #cfe8f5; color:var(--pln-navy); font-size:11.5px; line-height:1.5; padding:10px 12px; border-radius:12px; margin-bottom:10px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
 .route-info-box .rib-link{ display:inline-flex; align-items:center; gap:6px; background:var(--pln-navy); color:#fff; font-weight:600; font-size:12px; padding:7px 12px; border-radius:8px; text-decoration:none; }
@@ -574,6 +576,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
         <h2 style="margin:0;font-size:18px;color:var(--pln-navy);">Dashboard Probing Tambah Daya</h2>
         <p style="margin:4px 0 0;font-size:12.5px;color:var(--text-secondary);" id="dashSubtitle">Memuat…</p>
       </div>
+      <button type="button" class="icon-btn" style="flex:0 0 auto; width:auto; gap:6px; border:1.5px solid var(--border); border-radius:10px; font-size:12.5px; font-weight:600; padding:9px 14px;" onclick="exportDashboardExcel()"><span class="msr" aria-hidden="true">download</span> Unduh Detail (Excel)</button>
     </div>
     <div class="stat-tiles" id="dashTiles"></div>
     <div class="dash-grid">
@@ -1111,13 +1114,23 @@ function saranTargetDaya(dayaSekarang){
   for(const t of DAYA_TANGGA){ if(t>d) return t; }
   return null;
 }
-// Estimasi biaya penyambungan naik 1 tingkat, dari tabel bebas yang diisi petugas sendiri
-// di Setelan (CFG.biayaNaikTingkat, dicari baris yang "Dari"-nya cocok dengan daya SEKARANG).
+// Estimasi biaya penyambungan, dari tabel bebas yang diisi petugas sendiri di Setelan
+// (CFG.biayaNaikTingkat). Kalau targetDaya diisi, dicari baris yang PERSIS cocok
+// "Dari"=dayaSekarang DAN "Ke"=targetDaya (mendukung tabel yang punya beberapa baris
+// dengan "Dari" sama tapi "Ke" beda-beda, mis. loncat lebih dari 1 tingkat). Kalau
+// targetDaya tidak diisi (dipakai di tempat yang belum tahu target pastinya, mis. kartu
+// ringkasan/agregat dashboard), fallback ke baris pertama yang "Dari"-nya cocok saja.
 // null kalau belum ada baris yang cocok / belum diisi.
-function estimasiBiayaPenyambungan(dayaSekarang){
+function estimasiBiayaPenyambungan(dayaSekarang, targetDaya){
   const d = parseInt(dayaSekarang,10)||0;
   const list = normalizeBiayaTanggaList(CFG && CFG.biayaNaikTingkat) || [];
-  const row = list.find(r=> parseInt(r.dari,10)===d && r.biaya!=null && r.biaya!=='' && !isNaN(r.biaya));
+  let row;
+  if(targetDaya!=null && targetDaya!==''){
+    const t = parseInt(targetDaya,10)||0;
+    row = list.find(r=> parseInt(r.dari,10)===d && parseInt(r.ke,10)===t && r.biaya!=null && r.biaya!=='' && !isNaN(r.biaya));
+  } else {
+    row = list.find(r=> parseInt(r.dari,10)===d && r.biaya!=null && r.biaya!=='' && !isNaN(r.biaya));
+  }
   return row ? Number(row.biaya) : null;
 }
 
@@ -1236,6 +1249,11 @@ function buildCustomersFromSheets(sheets){
       c.tanggalUpdateTerakhir = p['Tanggal Update Terakhir'] || '';
       c.targetDayaVA = p['Target Daya (VA)'] || '';
       c.biayaPenyambungan = p['Biaya Penyambungan (Rp)'] || '';
+      // "Diskon (Rp)" & "Promo" — kolom opsional, baru berfungsi kalau nama kolom itu
+      // sudah ditambahkan persis di sheet "Progres Probing" (kalau belum ada, nilainya
+      // otomatis kosong di sini dan aman-aman saja, tidak akan error).
+      c.diskon = p['Diskon (Rp)'] || '';
+      c.promo = p['Promo'] || '';
       c.foto = p['Foto'] || '';
       c.petugasProbing = p['Petugas'] || '';
       c.progresRow = p.__row;
@@ -1243,6 +1261,7 @@ function buildCustomersFromSheets(sheets){
     } else {
       c.statusProbing = 'Belum Dikunjungi';
       c.catatanTerakhir = ''; c.tanggalUpdateTerakhir = ''; c.targetDayaVA = ''; c.biayaPenyambungan = ''; c.foto = '';
+      c.diskon = ''; c.promo = '';
       c.progresRow = null;
     }
     c.statusKey = statusKeyOf(c.statusProbing);
@@ -1313,7 +1332,7 @@ function getTargetList(){
     (filters.priority.length===0 || filters.priority.includes(c.priority)) &&
     (filters.daya.length===0 || filters.daya.includes(String(c.daya))) &&
     (filters.kogol.length===0 || filters.kogol.includes(String(c.kogol))) &&
-    (filters.tarif.length===0 || filters.tarif.includes(c.tarif)) &&
+    (filters.tarif.length===0 || (c.tarif && filters.tarif.includes(String(c.tarif).charAt(0).toUpperCase()))) &&
     (filters.sumberTarget.length===0 ||
       (filters.sumberTarget.includes('jamnyala') && c.srcJamNyala) ||
       (filters.sumberTarget.includes('dibatalkan') && c.srcDibatalkan)) &&
@@ -1560,43 +1579,51 @@ function buildFilterSheetOptions(){
   if(!body) return;
   const dayaOpts = distinctValues('daya').sort((a,b)=>parseInt(a)-parseInt(b));
   const kogolOpts = distinctValues('kogol');
-  const tarifOpts = distinctValues('tarif');
+  // Tarif dikelompokkan berdasarkan huruf depan kode (mis. B1, B1T, B2, B2T -> "B") supaya
+  // daftar pilihan ringkas, bukan puluhan kode tarif granular satu per satu.
+  const tarifGroupOpts = Array.from(new Set(
+    distinctValues('tarif').map(t=>String(t).charAt(0).toUpperCase()).filter(Boolean)
+  )).sort();
   const petugasOpts = distinctValues('petugas');
 
-  function chipRow(group, values, current, multiValue){
-    return '<div class="chip-row" data-group="'+group+'">' + values.map(v=>{
-      const active = multiValue ? current.includes(v) : current===v;
-      return '<button type="button" class="chip'+(active?' active':'')+'" data-val="'+escapeHtml(v)+'" onclick="toggleChip(this,\''+group+'\')">'+escapeHtml(v)+'</button>';
-    }).join('') + '</div>';
+  function selectMulti(group, values, current, labelFn){
+    labelFn = labelFn || (v=>v);
+    const rows = Math.max(2, Math.min(6, values.length));
+    return '<select class="filter-select" data-group="'+group+'" multiple size="'+rows+'">' +
+      values.map(v=>'<option value="'+escapeHtml(v)+'"'+(current.includes(v)?' selected':'')+'>'+escapeHtml(labelFn(v))+'</option>').join('') +
+      '</select>'+
+      '<div class="fg-hint">Tahan Ctrl (atau Cmd di Mac) sambil klik untuk pilih lebih dari satu — di ponsel, cukup ketuk beberapa pilihan.</div>';
+  }
+  function selectSingle(group, values, current){
+    return '<select class="filter-select" data-group="'+group+'">' +
+      '<option value="all"'+(current==='all'?' selected':'')+'>Semua</option>' +
+      values.map(v=>'<option value="'+escapeHtml(v)+'"'+(current===v?' selected':'')+'>'+escapeHtml(v)+'</option>').join('') +
+      '</select>';
+  }
+  // Header tiap kelompok filter (fg-label) — hitam tebal (lihat CSS .fg-label) supaya
+  // lebih menonjol dibanding versi lama yang abu-abu.
+  function fgLabel(text){
+    return '<div class="fg-label">'+text+'</div>';
   }
 
   body.innerHTML =
-    '<div class="filter-group"><div class="fg-label">Prioritas</div>'+chipRow('priority',['tinggi','sedang'],filters.priority,true)+'</div>'+
-    '<div class="filter-group"><div class="fg-label">Sumber Target</div>'+chipRow('sumberTarget',['jamnyala','dibatalkan'],filters.sumberTarget,true)+'</div>'+
-    (dayaOpts.length? '<div class="filter-group"><div class="fg-label">Daya Tersambung (VA)</div>'+chipRow('daya',dayaOpts,filters.daya,true)+'</div>' : '')+
-    (kogolOpts.length? '<div class="filter-group"><div class="fg-label">Kode Golongan</div>'+chipRow('kogol',kogolOpts,filters.kogol,true)+'</div>' : '')+
-    (tarifOpts.length? '<div class="filter-group"><div class="fg-label">Tarif</div>'+chipRow('tarif',tarifOpts,filters.tarif,true)+'</div>' : '')+
-    (petugasOpts.length? '<div class="filter-group"><div class="fg-label">Petugas / Rute</div>'+chipRow('petugas',['all',...petugasOpts],[filters.petugas],false)+'</div>' : '')+
-    '<div class="filter-group"><div class="fg-label">ID Pelanggan Manual (opsional — tempel, satu ID per baris, mengesampingkan filter lain di atas)</div>'+
+    '<div class="filter-group">'+fgLabel('Prioritas')+selectMulti('priority',['tinggi','sedang'],filters.priority, v=>v==='tinggi'?'Tinggi':'Sedang')+'</div>'+
+    '<div class="filter-group">'+fgLabel('Sumber Target')+selectMulti('sumberTarget',['jamnyala','dibatalkan'],filters.sumberTarget, v=>v==='jamnyala'?'Jam Nyala':'Dibatalkan')+'</div>'+
+    (dayaOpts.length? '<div class="filter-group">'+fgLabel('Daya Tersambung (VA)')+selectMulti('daya',dayaOpts,filters.daya, v=>v+' VA')+'</div>' : '')+
+    (kogolOpts.length? '<div class="filter-group">'+fgLabel('Kode Golongan')+selectMulti('kogol',kogolOpts,filters.kogol)+'</div>' : '')+
+    (tarifGroupOpts.length? '<div class="filter-group">'+fgLabel('Tarif')+selectMulti('tarif',tarifGroupOpts,filters.tarif, v=>v)+'</div>' : '')+
+    (petugasOpts.length? '<div class="filter-group">'+fgLabel('Petugas / Rute')+selectSingle('petugas',petugasOpts,filters.petugas)+'</div>' : '')+
+    '<div class="filter-group">'+fgLabel('ID Pelanggan Manual (opsional — tempel, satu ID per baris, mengesampingkan filter lain di atas)')+
       '<textarea id="manualIdText" rows="3" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:8px;font-size:12.5px;">'+(filters.manualIds? filters.manualIds.join('\n') : '')+'</textarea></div>';
-}
-function toggleChip(btn, group){
-  const val = btn.getAttribute('data-val');
-  if(group==='petugas'){
-    document.querySelectorAll('.chip-row[data-group="petugas"] .chip').forEach(c=>c.classList.remove('active'));
-    btn.classList.add('active');
-    return;
-  }
-  btn.classList.toggle('active');
 }
 function applyFiltersFromSheet(){
   const groups = ['priority','sumberTarget','daya','kogol','tarif'];
   groups.forEach(g=>{
-    const active = Array.from(document.querySelectorAll('.chip-row[data-group="'+g+'"] .chip.active')).map(b=>b.getAttribute('data-val'));
-    filters[g] = active;
+    const sel = document.querySelector('select.filter-select[data-group="'+g+'"]');
+    filters[g] = sel ? Array.from(sel.selectedOptions).map(o=>o.value) : [];
   });
-  const petugasChip = document.querySelector('.chip-row[data-group="petugas"] .chip.active');
-  filters.petugas = petugasChip ? petugasChip.getAttribute('data-val') : 'all';
+  const petugasSel = document.querySelector('select.filter-select[data-group="petugas"]');
+  filters.petugas = petugasSel ? petugasSel.value : 'all';
   const manualRaw = (document.getElementById('manualIdText')||{}).value || '';
   const ids = manualRaw.split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean);
   filters.manualIds = ids.length ? ids : null;
@@ -1758,7 +1785,17 @@ function openLapanganDetail(idpel){
   const dist = startPoint==='gps' ? c.distGps : c.distOffice;
   const distText = dist!=null ? dist.toFixed(1)+' km '+(startPoint==='gps'?'dari lokasi Anda':'dari kantor') : 'jarak tidak tersedia';
   const saran = saranTargetDaya(c.daya);
-  const estimasiBiaya = estimasiBiayaPenyambungan(c.daya);
+  const currentTarget = c.targetDayaVA || saran || '';
+  const estimasiBiaya = estimasiBiayaPenyambungan(c.daya, currentTarget);
+  // Pilihan tangga daya untuk dropdown Target Daya — hanya tingkat yang LEBIH TINGGI dari
+  // daya sekarang (tidak masuk akal "tambah daya" ke tingkat sama/lebih rendah). Kalau
+  // pelanggan ini sudah punya Target Daya tersimpan dari SEBELUM dropdown ini ada (nilai
+  // custom/non-standar), nilai itu tetap disisipkan di depan supaya tidak diam-diam berubah.
+  let targetOptions = DAYA_TANGGA.filter(t=>t>c.daya);
+  if(currentTarget && !targetOptions.map(String).includes(String(currentTarget))){
+    targetOptions = [parseInt(currentTarget,10)].concat(targetOptions);
+  }
+  const biayaBersih = Math.max(0, parseRupiah(c.biayaPenyambungan) - parseRupiah(c.diskon));
   const teleponHref = (c.kontak1||'').replace(/[^0-9+]/g,'');
   const hasCoord = c.lat!=null && c.lng!=null && !isNaN(c.lat) && !isNaN(c.lng);
   const mapsHref = hasCoord ? 'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng : '';
@@ -1801,6 +1838,13 @@ function openLapanganDetail(idpel){
       '<div class="kv-row"><span class="k">Alamat</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.addr||'')+'</span></div>'+
       (c.tanggalUpdateTerakhir? '<div class="kv-row"><span class="k">Update terakhir</span><span class="v">'+escapeHtml(String(c.tanggalUpdateTerakhir))+(c.petugasProbing?(' · '+escapeHtml(c.petugasProbing)):'')+'</span></div>' : '')+
       (c.catatanTerakhir? '<div class="kv-row"><span class="k">Catatan terakhir</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.catatanTerakhir)+'</span></div>' : '')+
+      // Rincian biaya yang SUDAH TERCATAT (bukan estimasi) — cuma tampil kalau memang sudah
+      // ada Biaya Penyambungan tersimpan dari kunjungan sebelumnya. Diskon & Promo cuma
+      // muncul kalau diisi, supaya tidak bikin sesak tampilan pelanggan yang tidak dapat promo.
+      (c.biayaPenyambungan? '<div class="kv-row"><span class="k">Biaya Penyambungan (sebelum diskon)</span><span class="v">'+formatRupiah(parseRupiah(c.biayaPenyambungan))+'</span></div>' : '')+
+      (c.diskon? '<div class="kv-row"><span class="k">Diskon</span><span class="v">-'+formatRupiah(parseRupiah(c.diskon))+'</span></div>' : '')+
+      (c.promo? '<div class="kv-row"><span class="k">Promo</span><span class="v">'+escapeHtml(c.promo)+'</span></div>' : '')+
+      (c.biayaPenyambungan && c.diskon? '<div class="kv-row"><span class="k" style="font-weight:600;">Total Setelah Diskon</span><span class="v" style="font-weight:600;">'+formatRupiah(biayaBersih)+'</span></div>' : '')+
 
       '<div class="form-block">'+
         '<div class="section-title" style="margin-top:0;">Catat Hasil Kunjungan</div>'+
@@ -1812,15 +1856,54 @@ function openLapanganDetail(idpel){
         '<label>Catatan</label>'+
         '<textarea id="vfCatatan" rows="3" placeholder="Catatan hasil kunjungan…">'+escapeHtml(c.catatanTerakhir||'')+'</textarea>'+
         '<label>Target Daya (VA)</label>'+
-        '<input id="vfTargetDaya" type="text" value="'+escapeAttr(c.targetDayaVA||(saran||''))+'" placeholder="mis. 900">'+
+        '<select id="vfTargetDaya" onchange="onTargetDayaChange(\''+idpel+'\')">'+
+          (targetOptions.length ? targetOptions.map(t=>'<option value="'+t+'"'+(String(currentTarget)===String(t)?' selected':'')+'>'+t+' VA</option>').join('') : '<option value="">(tidak ada tingkat lebih tinggi)</option>')+
+        '</select>'+
         '<label>Biaya Penyambungan (Rp)</label>'+
-        '<input id="vfBiaya" type="text" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi">'+
-        (!c.biayaPenyambungan && estimasiBiaya!=null ? '<div class="field-hint" style="margin-top:-10px;">Terisi otomatis dari estimasi — sesuaikan setelah biaya sebenarnya diketahui.</div>' : '')+
+        '<input id="vfBiaya" type="text" inputmode="numeric" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi" oninput="updateBiayaBersihHint()">'+
+        (!c.biayaPenyambungan && estimasiBiaya!=null ? '<div class="field-hint" style="margin-top:-10px;">Terisi otomatis dari tabel tangga biaya di Pengaturan sesuai Target Daya di atas — sesuaikan setelah biaya sebenarnya diketahui.</div>' : '')+
+        '<label>Diskon (Rp)</label>'+
+        '<input id="vfDiskon" type="text" inputmode="numeric" value="'+escapeAttr(c.diskon||'')+'" placeholder="0 (kosongkan kalau tidak ada)" oninput="updateBiayaBersihHint()">'+
+        '<label>Promo / Program Tematik</label>'+
+        '<input id="vfPromo" type="text" value="'+escapeAttr(c.promo||'')+'" placeholder="mis. Promo HUT PLN Agustus 2026">'+
+        '<div class="field-hint" id="vfBiayaBersihHint" style="display:'+(parseRupiah(c.diskon)>0?'':'none')+';">'+(parseRupiah(c.diskon)>0?('Setelah diskon: '+formatRupiah(biayaBersih)):'')+'</div>'+
         '<input id="vfFoto" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleFotoPicked(this)">'+
         '<button class="save-btn" id="vfSaveBtn" onclick="saveVisitOutcome(\''+idpel+'\')">Simpan Hasil Kunjungan</button>'+
         '<div class="status-msg" id="vfMsg"></div>'+
       '</div>'+
     '</div>';
+}
+// Dipanggil saat dropdown Target Daya diganti — cari ulang estimasi biaya yang PERSIS
+// cocok untuk kombinasi (daya sekarang → target baru) dari tabel tangga biaya di
+// Pengaturan, lalu isi otomatis ke field Biaya Penyambungan (petugas tetap bebas
+// mengoreksinya secara manual sesudahnya).
+function onTargetDayaChange(idpel){
+  const c = customers.find(x=>x.idpel===idpel);
+  if(!c) return;
+  const sel = document.getElementById('vfTargetDaya');
+  const target = sel ? sel.value : '';
+  const est = estimasiBiayaPenyambungan(c.daya, target);
+  const biayaInput = document.getElementById('vfBiaya');
+  if(biayaInput) biayaInput.value = est!=null ? est : '';
+  updateBiayaBersihHint();
+}
+// Dipanggil tiap kali field Biaya Penyambungan atau Diskon diketik ulang — supaya
+// petugas langsung lihat berapa yang benar-benar diterima setelah dipotong diskon,
+// tanpa perlu hitung manual atau simpan dulu.
+function updateBiayaBersihHint(){
+  const hint = document.getElementById('vfBiayaBersihHint');
+  if(!hint) return;
+  const biayaInput = document.getElementById('vfBiaya');
+  const diskonInput = document.getElementById('vfDiskon');
+  const biaya = parseRupiah(biayaInput ? biayaInput.value : '');
+  const diskon = parseRupiah(diskonInput ? diskonInput.value : '');
+  if(diskon>0){
+    hint.textContent = 'Setelah diskon: '+formatRupiah(Math.max(0, biaya-diskon));
+    hint.style.display = '';
+  } else {
+    hint.textContent = '';
+    hint.style.display = 'none';
+  }
 }
 function triggerFotoPicker(){
   const inp = document.getElementById('vfFoto');
@@ -1864,6 +1947,8 @@ async function saveVisitOutcome(idpel){
     const catatan = document.getElementById('vfCatatan').value;
     const targetDaya = document.getElementById('vfTargetDaya').value;
     const biaya = document.getElementById('vfBiaya').value;
+    const diskon = document.getElementById('vfDiskon').value;
+    const promo = document.getElementById('vfPromo').value;
     const fotoInput = document.getElementById('vfFoto');
     let fotoLink = c.foto || '';
 
@@ -1881,11 +1966,18 @@ async function saveVisitOutcome(idpel){
       'IDPEL': idpel, 'Nama': c.name, 'Telepon': c.kontak1||'', 'Petugas': (APP_USER&&APP_USER.name)||'',
       'Status Probing': status, 'Tanggal Update Terakhir': tanggal, 'Catatan Terakhir': catatan,
       'Target Daya (VA)': targetDaya, 'Biaya Penyambungan (Rp)': biaya,
+      'Diskon (Rp)': diskon, 'Promo': promo,
       'Latitude': myGps? myGps.lat : (isNaN(c.lat)?'':c.lat), 'Longitude': myGps? myGps.lng : (isNaN(c.lng)?'':c.lng),
       'Foto': fotoLink
     };
     const header = SHEET_HEADERS.progres && SHEET_HEADERS.progres.length ? SHEET_HEADERS.progres : Object.keys(valueMap);
     const rowValues = header.map(h=> valueMap[h]!==undefined ? valueMap[h] : '');
+    // "Diskon (Rp)" & "Promo" cuma benar-benar tersimpan kalau nama kolom itu sudah ada
+    // persis di sheet "Progres Probing" — kalau header sheet belum punya kolom itu, nilainya
+    // otomatis terlewat di baris di atas (bukan error, cuma tidak ada tempat menyimpannya).
+    if(!header.includes('Diskon (Rp)') || !header.includes('Promo')){
+      console.warn('Kolom "Diskon (Rp)" dan/atau "Promo" belum ada di sheet Progres Probing — nilainya belum tersimpan ke spreadsheet.');
+    }
 
     if(c.progresRow){
       await sheetsUpdateRow(SHEET_NAMES.progres, c.progresRow, rowValues);
@@ -1894,12 +1986,12 @@ async function saveVisitOutcome(idpel){
     }
 
     c.statusProbing = status; c.catatanTerakhir = catatan; c.tanggalUpdateTerakhir = tanggal;
-    c.targetDayaVA = targetDaya; c.biayaPenyambungan = biaya; c.foto = fotoLink;
+    c.targetDayaVA = targetDaya; c.biayaPenyambungan = biaya; c.diskon = diskon; c.promo = promo; c.foto = fotoLink;
     c.petugasProbing = (APP_USER&&APP_USER.name)||'';
     c.statusKey = statusKeyOf(status);
 
     msg.className = 'status-msg ok';
-    msg.textContent = 'Tersimpan ke Progres Probing.';
+    msg.textContent = 'Tersimpan ke Progres Probing.'+((!header.includes('Diskon (Rp)') || !header.includes('Promo')) ? ' (Kolom Diskon/Promo belum ada di sheet — lihat catatan di bawah.)' : '');
     btn.disabled = false; btn.textContent = 'Simpan Hasil Kunjungan';
     renderMappingList();
   } catch(err){
@@ -1929,7 +2021,24 @@ async function uploadPhotoToDrive(file, idpel){
   });
   if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('Gagal unggah foto ke Drive (HTTP '+res.status+'). '+t.slice(0,200)); }
   const data = await res.json();
-  return data.webViewLink || ('https://drive.google.com/file/d/'+data.id+'/view');
+
+  // "webViewLink" (halaman viewer Drive) TIDAK BISA dipakai langsung sebagai src <img> —
+  // itu halaman HTML, bukan berkas gambar mentah, jadi thumbnail di RADAR tidak akan pernah
+  // muncul kalau link itu yang disimpan (selalu jatuh ke fallback "lihat di Drive"). Supaya
+  // foto benar-benar tampil sebagai thumbnail DAN bisa dilihat petugas lain (bukan cuma akun
+  // yang upload), file-nya dibuat "siapa saja yang punya link boleh lihat" lalu dipakai URL
+  // konten langsung (drive.google.com/uc?export=view). Kalau langkah set-izin ini gagal
+  // (mis. dibatasi kebijakan Workspace admin), jangan gagalkan seluruh proses simpan — foto
+  // tetap ke-upload, cuma mungkin belum tentu bisa dilihat akun lain sampai izinnya diatur manual.
+  try{
+    await fetch('https://www.googleapis.com/drive/v3/files/'+data.id+'/permissions', {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' },
+      body: JSON.stringify({ role:'reader', type:'anyone' })
+    });
+  }catch(e){ console.warn('Gagal set izin publik foto Drive:', e); }
+
+  return 'https://drive.google.com/uc?export=view&id='+data.id;
 }
 function fileToBase64(file){
   return new Promise((resolve,reject)=>{
@@ -2218,6 +2327,56 @@ function toggleTrendTable(){
   if(btn) btn.textContent = show ? 'Sembunyikan tabel' : 'Lihat sebagai tabel';
 }
 
+/* Unduh detail pelanggan yang mendasari seluruh angka Dashboard (persis pelanggan
+   yang lolos Filter Lanjutan aktif saat ini) sebagai file Excel (.xlsx), memakai
+   SheetJS yang dimuat dari CDN di <head>. Satu baris = satu pelanggan, kolom-kolom
+   mengikuti field yang sama dipakai untuk menghitung tile & funnel Dashboard, supaya
+   angka di Excel selalu bisa ditelusuri balik ke rekap di layar. */
+function exportDashboardExcel(){
+  if(typeof XLSX === 'undefined'){
+    alert('Gagal membuat file Excel — koneksi internet dibutuhkan sekali untuk memuat pustaka unduhan (xlsx). Coba lagi setelah tersambung internet.');
+    return;
+  }
+  const list = getTargetList();
+  if(!list.length){
+    alert('Tidak ada data pelanggan pada filter yang aktif saat ini untuk diunduh.');
+    return;
+  }
+  const rows = list.map(c=>{
+    const biayaKotor = parseRupiah(c.biayaPenyambungan);
+    const diskon = parseRupiah(c.diskon);
+    const biayaBersih = c.biayaPenyambungan ? Math.max(0, biayaKotor - diskon) : '';
+    return {
+      'IDPEL': c.idpel || '',
+      'Nama': c.name || '',
+      'Alamat': c.addr || '',
+      'Kecamatan': c.kecamatan || '',
+      'Petugas (Data Identitas)': c.petugas || '',
+      'Petugas Pencatat Progres': c.petugasProbing || '',
+      'Status Probing': c.statusKey || '',
+      'Prioritas': c.priority || '',
+      'Sumber Target': [c.srcJamNyala?'Jam Nyala':'', c.srcDibatalkan?'Dibatalkan':''].filter(Boolean).join(' & '),
+      'Daya Saat Ini (VA)': c.daya || '',
+      'Target Daya (VA)': c.targetDayaVA || '',
+      'Tarif': c.tarif || '',
+      'Kode Golongan': c.kogol || '',
+      'Biaya Penyambungan Sebelum Diskon (Rp)': c.biayaPenyambungan ? biayaKotor : '',
+      'Diskon (Rp)': c.diskon ? diskon : '',
+      'Promo': c.promo || '',
+      'Biaya Setelah Diskon (Rp)': biayaBersih,
+      'Tanggal Update Terakhir': c.tanggalUpdateTerakhir || '',
+      'Catatan Terakhir': c.catatanTerakhir || '',
+      'Latitude': c.lat!=null ? c.lat : '',
+      'Longitude': c.lng!=null ? c.lng : ''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(k=>({ wch: Math.min(38, Math.max(10, k.length+2)) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Detail Pelanggan');
+  XLSX.writeFile(wb, 'RADAR_Detail_Dashboard_'+todayStr()+'.xlsx');
+}
+
 function renderDashboard(){
   const subEl = document.getElementById('dashSubtitle');
   const tilesEl = document.getElementById('dashTiles');
@@ -2233,13 +2392,16 @@ function renderDashboard(){
   const ditolak = list.filter(c=>c.statusKey==='ditolak').length;
   const konversi = total ? (selesai/total*100) : 0;
   const pipelineAktif = list.filter(c=>c.statusKey!=='selesai' && c.statusKey!=='ditolak');
-  const realisasiBiaya = list.filter(c=>c.statusKey==='selesai').reduce((sum,c)=>sum+parseRupiah(c.biayaPenyambungan),0);
+  // Realisasi Biaya Penyambungan dihitung SETELAH dipotong diskon (kalau ada) — supaya
+  // angka di dashboard mencerminkan uang yang benar-benar diterima, bukan tarif kotor.
+  const realisasiBiaya = list.filter(c=>c.statusKey==='selesai')
+    .reduce((sum,c)=> sum + Math.max(0, parseRupiah(c.biayaPenyambungan) - parseRupiah(c.diskon)), 0);
   const realisasiDaya = list.filter(c=>c.statusKey==='selesai')
     .reduce((sum,c)=>{ const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(c.daya) || c.daya; return sum+Math.max(0, t-c.daya); },0);
   const potensiDaya = pipelineAktif
     .reduce((sum,c)=>{ const s = saranTargetDaya(c.daya); return s ? sum+(s-c.daya) : sum; },0);
   const potensiBiaya = pipelineAktif
-    .reduce((sum,c)=>{ const e = estimasiBiayaPenyambungan(c.daya); return e!=null ? sum+e : sum; },0);
+    .reduce((sum,c)=>{ const s = saranTargetDaya(c.daya); const e = estimasiBiayaPenyambungan(c.daya, s); return e!=null ? sum+e : sum; },0);
 
   subEl.textContent = (DEMO_MODE?'Mode Demo — ':'') + total+' pelanggan target sesuai filter aktif · diperbarui otomatis dari Google Sheets';
 
@@ -2251,7 +2413,7 @@ function renderDashboard(){
     '<div class="tile"><div class="l">Estimasi Potensi Tambah Daya</div><div class="n">'+(potensiDaya/1000).toFixed(1)+' kVA</div><div class="d">dari pipeline yang masih aktif</div></div>'+
     '<div class="tile"><div class="l">Estimasi Potensi Biaya Penyambungan</div><div class="n">'+formatRupiah(potensiBiaya)+'</div><div class="d">dari pipeline yang masih aktif</div></div>'+
     '<div class="tile"><div class="l">Realisasi Tambah Daya</div><div class="n">'+(realisasiDaya/1000).toFixed(1)+' kVA</div><div class="d">dari '+selesai+' pelanggan tersambung</div></div>'+
-    '<div class="tile"><div class="l">Realisasi Biaya Penyambungan</div><div class="n">'+formatRupiah(realisasiBiaya)+'</div><div class="d">dari '+selesai+' pelanggan tersambung</div></div>';
+    '<div class="tile"><div class="l">Realisasi Biaya Penyambungan</div><div class="n">'+formatRupiah(realisasiBiaya)+'</div><div class="d">dari '+selesai+' pelanggan tersambung · setelah diskon</div></div>';
 
   function funnelRow(label, val, max, color){
     const w = max ? Math.round(val/max*100) : 0;
