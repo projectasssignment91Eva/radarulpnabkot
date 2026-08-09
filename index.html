@@ -1231,6 +1231,52 @@ function findFotoPaska(idpel){
 function fotoPaskaViewUrl(fileId){
   return 'https://drive.google.com/uc?export=view&id='+fileId;
 }
+// Set izin "siapa saja yang punya link boleh lihat" pada SATU file Drive — dipakai baik
+// setelah RADAR sendiri yang mengunggah foto (di uploadFileToDrive()) MAUPUN untuk foto rumah
+// yang SUDAH ADA lebih dulu di folder "Foto Paska" (diunggah manual lewat Drive langsung,
+// bukan lewat RADAR) yang mungkin belum pernah diberi izin publik itu — itu penyebab paling
+// umum kenapa foto rumah yang sudah cocok ditemukan tetap gagal tampil (browser tidak bisa
+// menampilkan <img> dari file Drive yang masih private, walau akun yang login sebenarnya
+// punya akses lewat Drive UI). Best-effort: kalau gagal (mis. akun yang login bukan pemilik
+// file itu dan bukan Editor foldernya), fungsi ini cuma mengembalikan false, tidak melempar
+// error yang mengganggu alur lain.
+async function ensurePublicReadable(fileId){
+  try{
+    const res = await fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'/permissions', {
+      method:'POST',
+      headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' },
+      body: JSON.stringify({ role:'reader', type:'anyone' })
+    });
+    return res.ok;
+  }catch(e){
+    console.warn('Gagal set izin publik file Drive ('+fileId+'):', e);
+    return false;
+  }
+}
+// Dipanggil dari atribut onerror <img> foto rumah kalau gagal dimuat. Alurnya bertahap:
+// 1) coba benahi izinnya jadi publik dulu (kemungkinan besar itu sebabnya), lalu muat ulang;
+// 2) kalau masih gagal, coba format URL alternatif (endpoint thumbnail Drive, kadang lebih
+//    permisif daripada uc?export=view);
+// 3) kalau masih gagal juga (mis. akun yang login memang tidak punya akses sama sekali ke
+//    file itu), baru menyerah dan tampilkan tautan "lihat di Drive" sebagai jalan pintas manual.
+async function handleFotoRumahLoadError(imgEl, fileId){
+  const stage = imgEl.dataset.stage || 'initial';
+  if(stage === 'initial'){
+    imgEl.dataset.stage = 'permfix';
+    if(!DEMO_MODE && ACCESS_TOKEN){
+      const fixed = await ensurePublicReadable(fileId);
+      if(fixed){ imgEl.src = fotoPaskaViewUrl(fileId); return; }
+    }
+    imgEl.dataset.stage = 'thumb';
+    imgEl.src = 'https://drive.google.com/thumbnail?id='+fileId+'&sz=w1000';
+  } else if(stage === 'permfix'){
+    imgEl.dataset.stage = 'thumb';
+    imgEl.src = 'https://drive.google.com/thumbnail?id='+fileId+'&sz=w1000';
+  } else {
+    const box = imgEl.parentNode;
+    if(box) box.innerHTML = '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>Foto tersimpan tapi belum bisa ditampilkan langsung — <a href="https://drive.google.com/file/d/'+fileId+'/view" target="_blank">lihat di Drive</a> (kemungkinan akun ini belum punya akses ke file/foldernya)</span></div>';
+  }
+}
 
 /* ---------------------------------------------------------------------
    5. BUSINESS LOGIC — porting mockup.html's computeTargetInfo() exactly
@@ -2182,8 +2228,8 @@ function openLapanganDetail(idpel){
       '</div>'+
 
       '<div class="detail-photo-box" id="fotoRumahBox">'+
-        (rumahPhotoUrl ?
-          '<img src="'+escapeAttr(rumahPhotoUrl)+'" onerror="this.parentNode.innerHTML=\'<div class=&quot;photo-placeholder&quot;><span class=&quot;msr photo-cam&quot; aria-hidden=&quot;true&quot;>photo_camera</span><span>Foto rumah tersimpan — <a href=&quot;'+escapeAttr(rumahPhotoUrl)+'&quot; target=&quot;_blank&quot;>lihat di Drive</a></span></div>\'">'
+        (paskaMatch ?
+          '<img src="'+escapeAttr(rumahPhotoUrl)+'" onerror="handleFotoRumahLoadError(this,\''+paskaMatch.id+'\')">'
           :
           '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>'+(fotoPaskaLoaded ? 'Belum ada foto rumah — buka tab Foto' : 'Memuat foto rumah…')+'</span></div>'
         )+
@@ -2515,13 +2561,7 @@ async function uploadFileToDrive(file, folderId, filename){
   // konten langsung (drive.google.com/uc?export=view). Kalau langkah set-izin ini gagal
   // (mis. dibatasi kebijakan Workspace admin), jangan gagalkan seluruh proses simpan — foto
   // tetap ke-upload, cuma mungkin belum tentu bisa dilihat akun lain sampai izinnya diatur manual.
-  try{
-    await fetch('https://www.googleapis.com/drive/v3/files/'+data.id+'/permissions', {
-      method:'POST',
-      headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' },
-      body: JSON.stringify({ role:'reader', type:'anyone' })
-    });
-  }catch(e){ console.warn('Gagal set izin publik file Drive:', e); }
+  await ensurePublicReadable(data.id);
 
   return { id: data.id, url: 'https://drive.google.com/uc?export=view&id='+data.id };
 }
