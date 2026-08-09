@@ -212,6 +212,12 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .quick-filters{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; margin-bottom:10px; }
 .quick-filters button{ border:1.5px solid var(--border); background:#fff; border-radius:999px; padding:7px 13px; font-size:13px; font-weight:600; color:var(--text-secondary); white-space:nowrap; }
 .quick-filters button.active{ background:var(--pln-yellow); border-color:var(--pln-yellow); color:#3a2a00; }
+.search-box{ display:flex; align-items:center; gap:8px; background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:9px 12px; margin-top:10px; }
+.search-box .msr{ font-size:18px; color:var(--text-muted); flex-shrink:0; }
+.search-box input{ flex:1; min-width:0; border:none; outline:none; font-size:13px; font-family:var(--font-ui); background:transparent; color:var(--text-primary); }
+.search-box input::placeholder{ color:var(--text-muted); }
+.search-clear{ border:none; background:transparent; padding:2px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); flex-shrink:0; }
+.search-clear .msr{ font-size:16px; }
 .filter-toolbar{ display:flex; gap:8px; margin-bottom:12px; }
 .filter-toolbar .apply-btn{ flex:1; background:var(--pln-navy); color:#fff; border:none; border-radius:10px; padding:10px; font-size:13px; font-weight:600; }
 .filter-toolbar .icon-btn{ border:1.5px solid var(--border); border-radius:10px; font-size:13px; font-weight:600; gap:5px; }
@@ -263,6 +269,11 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .empty-note{ text-align:center; color:var(--text-muted); font-size:12.5px; padding:30px 0; }
 
 /* ---------- detail view ---------- */
+/* #lapanganDetailView membungkus tombol "Kembali" + .detail-card sebagai satu unit, dibatasi
+   lebar maksimum & ditengahkan di layar lebar — supaya SEMUA isinya (judul, tab, grafik,
+   tabel, form) konsisten selebar itu, bukan melebar penuh mengikuti sisa lebar layar (yang
+   bikin grafik/tabel di dalamnya terasa "mengambang" sendiri kalau cuma dibatasi sebagian). */
+#lapanganDetailView{ max-width:720px; margin:0 auto; }
 .detail-card{ background:#fff; border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow-xs); }
 .detail-photo-box{ width:100%; height:170px; border-radius:14px; background:var(--page); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; overflow:hidden; margin-bottom:16px; position:relative; }
 .detail-photo-box img{ width:100%; height:100%; object-fit:cover; }
@@ -293,6 +304,31 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .spinner{ display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 .section-title{ font-size:13px; font-weight:600; color:var(--pln-navy); margin:18px 0 8px; }
+
+/* ---------- detail view: tab pelanggan (Info | Foto | Pemakaian | Riwayat) ---------- */
+.detail-tabs{ display:flex; gap:4px; background:var(--page); border-radius:12px; padding:4px; margin:2px 0 16px; }
+.detail-tab{ flex:1; border:none; background:transparent; padding:8px 4px; font-size:12px; font-weight:600; color:var(--text-secondary); border-radius:9px; text-align:center; }
+.detail-tab.active{ background:#fff; color:var(--pln-navy); box-shadow:var(--shadow-xs); }
+.detail-tab-panel{ }
+.subsection-title{ font-size:12px; font-weight:700; color:var(--text-secondary); margin:0 0 8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.foto-sub-block{ margin-bottom:22px; }
+.foto-sub-block:last-child{ margin-bottom:0; }
+.foto-sync-note{ font-size:11px; color:var(--text-muted); margin:-2px 0 10px; line-height:1.4; }
+.foto-sync-note.ok{ color:#0b6b46; }
+.small-action-btn{ display:inline-flex; align-items:center; gap:4px; background:var(--page); border:1px solid var(--border); border-radius:10px; padding:7px 12px; font-size:11.5px; font-weight:600; color:var(--pln-navy); }
+.small-action-btn .msr{ font-size:15px; }
+.usage-chart-box{ background:var(--page); border:1px solid var(--border); border-radius:12px; padding:10px 6px 4px; margin-bottom:10px; }
+.usage-table{ width:100%; border-collapse:collapse; font-size:12px; margin-bottom:4px; }
+.usage-table th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted); padding:6px 6px; border-bottom:1.5px solid var(--border); }
+.usage-table td{ padding:8px 6px; border-bottom:1px solid var(--border); }
+.usage-table tr:last-child td{ border-bottom:none; }
+.riwayat-timeline{ display:flex; flex-direction:column; gap:12px; }
+.riwayat-item{ border-left:2px solid var(--border); padding:2px 0 2px 14px; position:relative; }
+.riwayat-item::before{ content:''; position:absolute; left:-5px; top:5px; width:8px; height:8px; border-radius:50%; background:var(--pln-blue); }
+.riwayat-item-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.riwayat-date{ font-size:11.5px; color:var(--text-muted); }
+.riwayat-note{ font-size:12.5px; margin-top:4px; color:var(--text-secondary); }
+.riwayat-petugas{ font-size:11px; color:var(--text-muted); margin-top:2px; }
 
 /* ---------- Probing Digital ---------- */
 .subtab-row{ display:flex; background:var(--page); border-radius:12px; padding:4px; margin-bottom:14px; }
@@ -410,6 +446,11 @@ table.trend-table tr:last-child td{ border-bottom:none; }
         <div class="hint">Kosongkan jika belum ada — foto akan diunggah ke folder utama Drive akun Anda.</div>
       </div>
       <div class="field">
+        <label>ID Folder Google Drive "Foto Paska" (foto rumah pelanggan)</label>
+        <input id="cfgFotoPaskaFolder" placeholder="1ZAT-Wtxv_uqZEA5zS5R8FVQehqCQwuC4">
+        <div class="hint">Sudah terisi otomatis dengan folder "Foto Paska" milik ULP Nabire Kota. RADAR mencocokkan foto rumah ke pelanggan lewat nama file yang mengandung ID Pelanggan. Ubah hanya jika folder sumbernya berbeda.</div>
+      </div>
+      <div class="field">
         <label>Koordinat Kantor (opsional, untuk mode "Dari Kantor")</label>
         <input id="cfgKantor" placeholder="-3.3667, 135.4931">
       </div>
@@ -502,6 +543,11 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       <div class="quick-filters">
         <button class="active" onclick="setLapanganMode('today', this)">Kunjungan Hari Ini</button>
         <button onclick="setLapanganMode('all', this)">Semua Target</button>
+      </div>
+      <div class="search-box">
+        <span class="msr" aria-hidden="true">search</span>
+        <input type="text" id="lapanganSearchInput" placeholder="Cari nama atau ID pelanggan…" oninput="onLapanganSearchInput(this.value)">
+        <button type="button" class="search-clear" id="lapanganSearchClear" style="display:none;" aria-label="Hapus pencarian" onclick="document.getElementById('lapanganSearchInput').value=''; onLapanganSearchInput('');"><span class="msr" aria-hidden="true">close</span></button>
       </div>
       <div id="lapanganCount" class="route-note"></div>
       <div id="custListLapangan"></div>
@@ -660,11 +706,13 @@ let routeLineHalo = null;     // garis "bayangan" gelap di bawah routeLine, supa
 
 let filters = { status:'all', priority:[], daya:[], kogol:[], tarif:[], sumberTarget:[], petugas:'all', manualIds:null };
 let lapanganMode = 'today';
+let lapanganSearchQuery = ''; // isian kolom cari (nama/IDPEL) di tab Probing Lapangan
 let todaysPlan = [];          // idpel list, in Mapping Target order
 let activeIdpel = null;       // currently open detail record in Probing Lapangan
 
 let prospekList = [];         // prospek manual (Media Sosial & Brosur/Event), dari sheet "Prospek Manual"
 let prospekSheetMissing = false; // true kalau spreadsheet belum punya tab "Prospek Manual"
+let riwayatSheetMissing = false; // true kalau spreadsheet belum punya tab "Riwayat Probing"
 let digitalSubtab = 'wa';
 
 // Nama tab disesuaikan persis dengan nama tab di Google Sheets master data sungguhan
@@ -678,10 +726,28 @@ const SHEET_NAMES = {
   batal: 'Batal Permohonan Tambah Daya',
   progres: 'Progres Probing',
   updateDaya: 'Update Daya',
-  prospek: 'Prospek Manual'
+  prospek: 'Prospek Manual',
+  riwayat: 'Riwayat Probing'
 };
 const PROSPEK_HEADER_DEFAULT = ['IDPEL','Nama','Telepon','Tipe','Sumber','Catatan','Tanggal','Petugas'];
+// "Riwayat Probing" adalah LOG tiap kali "Simpan Hasil Kunjungan" ditekan (append-only, baris
+// lama tidak pernah ditimpa) — beda dengan "Progres Probing" yang cuma menyimpan status
+// TERKINI (baris yang sama terus ditimpa). Log ini yang dipakai tab "Riwayat" di kartu detail
+// pelanggan untuk menampilkan riwayat tahapan probing dari waktu ke waktu.
+const RIWAYAT_HEADER_DEFAULT = ['IDPEL','Tanggal','Status Probing','Catatan','Petugas'];
 const STATUS_OPTIONS = ['Belum Dikunjungi','Sudah Dikunjungi','Follow Up','Permohonan','Bayar','Tersambung','Ditolak','Tidak Bisa Dikunjungi'];
+// Folder Drive "Foto Paska" (foto rumah pelanggan Pascabayar, sudah ada sebelum RADAR dibuat)
+// milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
+// Lanjutan dikosongkan, supaya fitur sinkron foto rumah langsung jalan tanpa perlu diisi manual.
+const FOTO_PASKA_FOLDER_ID_DEFAULT = '1ZAT-Wtxv_uqZEA5zS5R8FVQehqCQwuC4';
+
+// Indeks file di folder "Foto Paska" (id + name), dimuat sekali tiap reloadAllData() lewat
+// loadFotoPaskaIndex(). Pencocokan ke pelanggan dilakukan lewat findFotoPaska(idpel) — mencari
+// file yang NAMANYA MENGANDUNG ID Pelanggan (bukan pencarian per-pelanggan ke Drive satu-satu,
+// supaya cuma perlu 1 kali panggilan API per pemuatan data, bukan 1 panggilan per pelanggan).
+let fotoPaskaFiles = [];
+let fotoPaskaLoaded = false;
+let fotoPaskaLoadError = null;
 
 /* ---------------------------------------------------------------------
    1. CONFIG / STORAGE HELPERS
@@ -725,6 +791,7 @@ function initApp(){
   document.getElementById('cfgSpreadsheetId').value = CFG.spreadsheetId || '';
   document.getElementById('cfgClientId').value = CFG.clientId || '';
   document.getElementById('cfgDriveFolder').value = CFG.driveFolder || '';
+  document.getElementById('cfgFotoPaskaFolder').value = CFG.fotoPaskaFolder || FOTO_PASKA_FOLDER_ID_DEFAULT;
   document.getElementById('cfgKantor').value = (CFG.kantorLat!=null && CFG.kantorLng!=null) ? (CFG.kantorLat+', '+CFG.kantorLng) : '';
 
   if(CFG.spreadsheetId && CFG.clientId && ACCESS_TOKEN){
@@ -809,6 +876,7 @@ function saveSetupConfig(){
   const spreadsheetId = document.getElementById('cfgSpreadsheetId').value.trim();
   const clientId = document.getElementById('cfgClientId').value.trim();
   const driveFolder = document.getElementById('cfgDriveFolder').value.trim();
+  const fotoPaskaFolder = document.getElementById('cfgFotoPaskaFolder').value.trim();
   const kantorRaw = document.getElementById('cfgKantor').value.trim();
   const errEl = document.getElementById('loginError');
   errEl.innerHTML = '';
@@ -823,7 +891,7 @@ function saveSetupConfig(){
     if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){ kantorLat = parts[0]; kantorLng = parts[1]; }
   }
   const biayaNaikTingkat = collectBiayaTanggaFromForm();
-  CFG = { spreadsheetId, clientId, driveFolder, kantorLat, kantorLng, biayaNaikTingkat };
+  CFG = { spreadsheetId, clientId, driveFolder, fotoPaskaFolder, kantorLat, kantorLng, biayaNaikTingkat };
   persistConfig(CFG);
   DEMO_MODE = false;
   clearToken(); // client id may have changed -> force fresh consent
@@ -852,6 +920,7 @@ function backToSetup(){
   document.getElementById('cfgSpreadsheetId').value = CFG.spreadsheetId || '';
   document.getElementById('cfgClientId').value = CFG.clientId || '';
   document.getElementById('cfgDriveFolder').value = CFG.driveFolder || '';
+  document.getElementById('cfgFotoPaskaFolder').value = CFG.fotoPaskaFolder || FOTO_PASKA_FOLDER_ID_DEFAULT;
   document.getElementById('cfgKantor').value = (CFG.kantorLat!=null && CFG.kantorLng!=null) ? (CFG.kantorLat+', '+CFG.kantorLng) : '';
   renderBiayaTanggaFields();
   showSigninGate();
@@ -1001,8 +1070,9 @@ async function reloadAllData(){
       customers = buildDemoCustomers();
       prospekList = buildDemoProspek();
       prospekSheetMissing = false;
+      fotoPaskaFiles = []; fotoPaskaLoaded = true; fotoPaskaLoadError = null;
     } else {
-      const sheets = await fetchAllSheets();
+      const [sheets] = await Promise.all([ fetchAllSheets(), loadFotoPaskaIndex() ]);
       customers = buildCustomersFromSheets(sheets);
       prospekList = sheets.prospek || [];
     }
@@ -1100,7 +1170,66 @@ async function fetchAllSheets(){
     SHEET_HEADERS.prospek = PROSPEK_HEADER_DEFAULT;
     prospekSheetMissing = true;
   }
+
+  // "Riwayat Probing" juga tab opsional (log tiap kunjungan, ditambahkan belakangan) — sama
+  // seperti "Prospek Manual", kalau spreadsheet lama belum punya tab ini, tab "Riwayat" di
+  // kartu detail pelanggan cuma menampilkan pesan pengingat, fitur lain tetap berjalan normal.
+  try{
+    const riwayatRows = await sheetsGet(SHEET_NAMES.riwayat+'!A1:Z100000');
+    const parsed = rowsToObjects(riwayatRows);
+    out.riwayat = parsed.items;
+    SHEET_HEADERS.riwayat = parsed.header.length ? parsed.header : RIWAYAT_HEADER_DEFAULT;
+    riwayatSheetMissing = false;
+  } catch(e){
+    out.riwayat = [];
+    SHEET_HEADERS.riwayat = RIWAYAT_HEADER_DEFAULT;
+    riwayatSheetMissing = true;
+  }
   return out;
+}
+
+// Memuat daftar file (id + name) di folder Drive "Foto Paska" satu kali per pemuatan data —
+// dipakai untuk mencocokkan foto rumah ke pelanggan lewat ID Pelanggan yang ada di nama file
+// (findFotoPaska()), tanpa perlu 1 panggilan API terpisah per pelanggan. Gagal dimuat (mis.
+// folder belum dibagikan ke akun yang sedang login, atau folder ID salah) TIDAK menggagalkan
+// seluruh pemuatan data — foto rumah otomatis cuma tidak muncul, sisanya tetap jalan normal.
+async function loadFotoPaskaIndex(){
+  fotoPaskaLoaded = false; fotoPaskaLoadError = null; fotoPaskaFiles = [];
+  const folderId = (CFG.fotoPaskaFolder||'').trim() || FOTO_PASKA_FOLDER_ID_DEFAULT;
+  if(!folderId){ fotoPaskaLoaded = true; return; }
+  try{
+    let pageToken = '';
+    let guard = 0;
+    do{
+      const q = "'"+folderId+"' in parents and trashed=false";
+      let url = 'https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields='+encodeURIComponent('nextPageToken,files(id,name)')+'&pageSize=1000';
+      if(pageToken) url += '&pageToken='+encodeURIComponent(pageToken);
+      const res = await fetch(url, { headers:{ Authorization:'Bearer '+ACCESS_TOKEN } });
+      if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' '+t.slice(0,150)); }
+      const data = await res.json();
+      fotoPaskaFiles = fotoPaskaFiles.concat(data.files||[]);
+      pageToken = data.nextPageToken || '';
+      guard++;
+    } while(pageToken && guard<50);
+  }catch(e){
+    console.warn('Gagal memuat indeks folder Foto Paska dari Drive:', e);
+    fotoPaskaLoadError = e.message || String(e);
+  }
+  fotoPaskaLoaded = true;
+}
+// Cari file di folder Foto Paska yang namanya MENGANDUNG ID Pelanggan ini (sesuai konfirmasi
+// bahwa penamaan file di folder itu persis/mengandung IDPEL). Kalau ada lebih dari satu yang
+// cocok (mis. foto lama + foto pengganti), ambil yang PALING BARU diunggah (nama file upload
+// manual RADAR menyisipkan Date.now() sehingga urutannya ikut terjaga; fallback tetap ambil
+// yang terakhir ditemukan kalau tidak bisa dibedakan).
+function findFotoPaska(idpel){
+  if(!idpel || !fotoPaskaFiles.length) return null;
+  const matches = fotoPaskaFiles.filter(f=> f.name && f.name.indexOf(idpel)!==-1);
+  if(!matches.length) return null;
+  return matches[matches.length-1];
+}
+function fotoPaskaViewUrl(fileId){
+  return 'https://drive.google.com/uc?export=view&id='+fileId;
 }
 
 /* ---------------------------------------------------------------------
@@ -1185,6 +1314,19 @@ function buildCustomersFromSheets(sheets){
     if(idpel) batalByIdpel[idpel] = r;
   });
 
+  // Riwayat Probing — log tiap kunjungan (append-only), dikelompokkan per IDPEL untuk
+  // ditampilkan sebagai linimasa tahapan probing di tab "Riwayat" kartu detail pelanggan.
+  // Urutan ditampilkan TERBARU DULU (baris paling akhir ditambahkan = kunjungan terakhir).
+  const riwayatByIdpel = {};
+  (sheets.riwayat||[]).forEach(r=>{
+    const idpel = String(r['IDPEL']||'').trim();
+    if(!idpel) return;
+    if(!riwayatByIdpel[idpel]) riwayatByIdpel[idpel] = [];
+    riwayatByIdpel[idpel].push({
+      tanggal: r['Tanggal']||'', status: r['Status Probing']||'', catatan: r['Catatan']||'', petugas: r['Petugas']||''
+    });
+  });
+
   // agregasi Pascabayar per IDPEL, urut berdasarkan THBLREK menaik
   const pascaByIdpel = {};
   (sheets.pasca||[]).forEach(r=>{
@@ -1237,6 +1379,16 @@ function buildCustomersFromSheets(sheets){
     rec.jamNyala = parseFloat(last['JAMNYALA'])||0;
     rec.dayaBulanIni = parseInt(last['DAYA'],10)||0;
     rec.dayaBulanLalu = parseInt(prev['DAYA'],10)||0;
+    // Riwayat pemakaian per periode (tab "Pemakaian"/"Riwayat" di kartu pelanggan) — kWh
+    // diambil dari kolom "PEMKWH" di sheet "Paskabayar" (dikonfirmasi langsung oleh admin ULP
+    // Nabire Kota, bukan nama kolom umum "kWh"). Simpan sampai 12 periode terakhir supaya
+    // tabel Riwayat Perubahan Daya cukup informatif, bukan cuma 6 seperti grafik Jam Nyala.
+    rec.usageHistory = hist.slice(-12).map(h=>({
+      periode: formatPeriode(h['THBLREK']),
+      daya: parseInt(h['DAYA'],10)||0,
+      kwh: parseFloat(h['PEMKWH'])||0,
+      jamNyala: parseFloat(h['JAMNYALA'])||0
+    }));
   });
 
   // 2) sumber Jam Nyala prabayar — sheet "Prabayar" sekarang hanya berisi kolom
@@ -1299,6 +1451,9 @@ function buildCustomersFromSheets(sheets){
     }
     c.statusKey = statusKeyOf(c.statusProbing);
     c.initials = initialsOf(c.name);
+    // riwayatByIdpel sudah dalam urutan sesuai baris sheet (lama->baru, karena append-only) —
+    // dibalik supaya paling baru tampil paling atas di tab Riwayat.
+    c.riwayatProbing = (riwayatByIdpel[c.idpel]||[]).slice().reverse();
   });
 
   return list;
@@ -1308,6 +1463,117 @@ function formatTanggal(v){
   if(!v) return '';
   if(typeof v === 'string') return v;
   return String(v);
+}
+// Kolom "THBLREK" di sheet Paskabayar berisi periode format YYYYMM (mis. "202607") —
+// ditampilkan jadi label ringkas "Jul 26" untuk sumbu grafik & tabel Riwayat Perubahan Daya.
+// Kalau formatnya tidak sesuai dugaan (bukan 6 digit angka), tampilkan apa adanya saja
+// daripada memaksakan parsing yang salah.
+const BULAN_PENDEK = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+function formatPeriode(v){
+  const s = String(v==null?'':v).trim();
+  if(/^\d{6}$/.test(s)){
+    const year = s.slice(0,4);
+    const monthIdx = parseInt(s.slice(4,6),10)-1;
+    if(monthIdx>=0 && monthIdx<12) return BULAN_PENDEK[monthIdx]+' '+year.slice(2);
+  }
+  return s || '-';
+}
+// Grafik garis sederhana (SVG murni, tanpa library eksternal) untuk "Riwayat Jam Nyala
+// (per bulan)" di tab Pemakaian — sengaja tidak pakai Chart.js/CDN lain supaya tetap tampil
+// walau koneksi internet di lapangan sedang lemah (pelajaran yang sama dengan alasan ikon
+// chevron Pengaturan Lanjutan dibuat CSS murni, bukan icon-font).
+function buildJamNyalaChartSvg(history){
+  if(!history || !history.length) return '<div class="empty-note" style="padding:20px 0;">Belum ada data pemakaian.</div>';
+  // Tinggi grafik SENGAJA DIPATOK LEWAT CSS (bukan height:auto) supaya tetap ~190px berapa pun
+  // lebar kartunya (HP maupun laptop) — sebelumnya height:auto bikin tinggi grafik ikut
+  // membesar proporsional kalau kartunya lebar (itu sebabnya tampak aneh & kebesaran di layar
+  // lebar). Dicoba juga pakai CSS "aspect-ratio" supaya X/Y selalu sebanding sempurna, tapi itu
+  // bikin TULISANNYA jadi kekecilan di HP (lebar kartu HP jauh lebih kecil dari lebar rancangan
+  // 640, jadi semuanya ikut mengecil termasuk teks) — makanya dibalik ke tinggi tetap: teks
+  // tetap terbaca jelas di HP, cuma titik datanya sedikit oval (bukan bulat sempurna) di lebar
+  // yang jauh dari rancangan awal — trade-off yang lebih baik untuk penggunaan di lapangan.
+  const W = 640, H = 200, padL = 38, padR = 34, padT = 26, padB = 26;
+  const vals = history.map(h=>h.jamNyala);
+  const maxV = Math.max.apply(null, vals.concat([500]));
+  const minV = Math.min.apply(null, vals.concat([0]));
+  const range = (maxV-minV) || 1;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const stepX = history.length>1 ? plotW/(history.length-1) : 0;
+  const xAt = i => padL + stepX*i;
+  const yAt = v => padT + plotH - ((v-minV)/range)*plotH;
+  const pts = history.map((h,i)=>({ x:xAt(i), y:yAt(h.jamNyala), label:h.periode, val:h.jamNyala }));
+
+  // Garis bantu horizontal (recessive, abu-abu tipis) + label nilainya di kiri — cuma penanda
+  // skala, bukan fokus utama grafik (itu tetap garis trennya).
+  const gridSteps = 3;
+  let gridBlock = '';
+  for(let g=0; g<=gridSteps; g++){
+    const val = minV + range*(g/gridSteps);
+    const y = yAt(val);
+    gridBlock += '<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#e6eaee" stroke-width="1"></line>'+
+      '<text x="'+(padL-8)+'" y="'+(y+3).toFixed(1)+'" font-size="10" text-anchor="end" fill="#8a96a3">'+Math.round(val)+'</text>';
+  }
+
+  const linePoints = pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const baseline = (padT+plotH).toFixed(1);
+  const areaPoints = linePoints+' '+(W-padR).toFixed(1)+','+baseline+' '+padL.toFixed(1)+','+baseline;
+
+  const dots = pts.map(p=>
+    '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="4" fill="#0b5fa5" stroke="#fff" stroke-width="1.5"><title>'+escapeHtml(p.label)+' — '+Math.round(p.val)+' jam</title></circle>'
+  ).join('');
+  const xLabels = pts.map(p=>'<text x="'+p.x.toFixed(1)+'" y="'+(H-8)+'" font-size="11" text-anchor="middle" fill="#8a96a3">'+escapeHtml(p.label)+'</text>').join('');
+
+  // Label nilai HANYA di titik terakhir (bulan terkini) — "selective direct label", bukan
+  // menumpuk angka di tiap titik yang bikin penuh sesak untuk grafik sekecil ini.
+  const lastPt = pts[pts.length-1];
+  const lastLabelY = lastPt.y - 12 < padT ? lastPt.y + 16 : lastPt.y - 12; // pindah ke bawah titik kalau kepentok atas
+  const lastLabel = '<text x="'+lastPt.x.toFixed(1)+'" y="'+lastLabelY.toFixed(1)+'" font-size="12" font-weight="700" text-anchor="middle" fill="#0b5fa5">'+Math.round(lastPt.val)+'</text>';
+
+  let thresholdBlock = '';
+  if(500>=minV && 500<=maxV){
+    const ty = yAt(500);
+    thresholdBlock = '<line x1="'+padL+'" y1="'+ty.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+ty.toFixed(1)+'" stroke="#E4032E" stroke-width="1.25" stroke-dasharray="5,4"></line>'+
+      '<text x="'+(W-padR)+'" y="'+(ty-7).toFixed(1)+'" font-size="10.5" font-weight="600" text-anchor="end" fill="#E4032E">ambang 500 jam</text>';
+  }
+
+  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:190px;display:block;">'+
+    '<defs><linearGradient id="jnFade" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="#0b5fa5" stop-opacity="0.16"></stop>'+
+      '<stop offset="100%" stop-color="#0b5fa5" stop-opacity="0"></stop>'+
+    '</linearGradient></defs>'+
+    gridBlock+
+    thresholdBlock+
+    '<polygon points="'+areaPoints+'" fill="url(#jnFade)" stroke="none"></polygon>'+
+    '<polyline points="'+linePoints+'" fill="none" stroke="#0b5fa5" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"></polyline>'+
+    dots+lastLabel+xLabels+
+  '</svg>';
+}
+function buildUsageHistoryTable(history){
+  if(!history || !history.length) return '<div class="empty-note" style="padding:16px 0;">Belum ada data riwayat.</div>';
+  const rows = history.slice().reverse().map(h=>
+    '<tr><td>'+escapeHtml(h.periode)+'</td><td>'+h.daya+' VA</td><td>'+h.kwh.toLocaleString('id-ID')+'</td><td>'+Math.round(h.jamNyala)+'</td></tr>'
+  ).join('');
+  return '<table class="usage-table"><thead><tr><th>Periode</th><th>Daya</th><th>kWh</th><th>Jam Nyala</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+// Linimasa tahapan probing (tab "Riwayat") — dibangun dari log append-only "Riwayat Probing"
+// (c.riwayatProbing, sudah diurutkan terbaru dulu oleh buildCustomersFromSheets()). Berbeda
+// dengan Progres Probing yang cuma menyimpan status TERKINI, log ini menunjukkan bagaimana
+// status pelanggan berubah dari kunjungan ke kunjungan (mis. Belum Dikunjungi → Follow Up →
+// Tersambung), lengkap dengan catatan & petugas tiap tahap.
+function buildRiwayatProbingTimeline(history){
+  if(!history || !history.length) return '<div class="empty-note" style="padding:16px 0;">Belum ada riwayat tahapan probing tercatat.</div>';
+  const items = history.map(h=>{
+    const key = statusKeyOf(h.status);
+    return '<div class="riwayat-item">'+
+      '<div class="riwayat-item-head">'+
+        '<span class="badge '+badgeCssClass(key)+'">'+escapeHtml(h.status||'-')+'</span>'+
+        '<span class="riwayat-date">'+escapeHtml(String(h.tanggal||'-'))+'</span>'+
+      '</div>'+
+      (h.catatan? '<div class="riwayat-note">'+escapeHtml(h.catatan)+'</div>' : '')+
+      (h.petugas? '<div class="riwayat-petugas">Petugas: '+escapeHtml(h.petugas)+'</div>' : '')+
+    '</div>';
+  }).join('');
+  return '<div class="riwayat-timeline">'+items+'</div>';
 }
 
 /* ---------------------------------------------------------------------
@@ -1335,7 +1601,24 @@ function buildDemoCustomers(){
       jenisPelanggan:'prabayar', kategoriDurasi:'>6 Bulan', daya:450, tarif:'R1', kogol:'1', permohonanDibatalkan:false,
       statusProbing:'Belum Dikunjungi', catatanTerakhir:'', tanggalUpdateTerakhir:'', targetDayaVA:'', biayaPenyambungan:'', petugasProbing:'' },
   ];
-  base.forEach(c=>{ c.statusKey = statusKeyOf(c.statusProbing); c.initials = initialsOf(c.name); c.foto=''; c.progresRow=null; });
+  base.forEach(c=>{
+    c.statusKey = statusKeyOf(c.statusProbing); c.initials = initialsOf(c.name); c.foto=''; c.progresRow=null;
+    // Data contoh Mode Demo untuk tab "Pemakaian"/"Riwayat" — dibangkitkan dari jamNyalaHistory
+    // yang sudah ada di atas (bukan data sungguhan, cuma supaya Mode Demo tidak kosong).
+    if(c.jenisPelanggan==='pascabayar' && Array.isArray(c.jamNyalaHistory)){
+      const bulanMundur = c.jamNyalaHistory.length;
+      const now = new Date(2026,6,1); // Jul 2026, tetap (Date.now() sengaja dihindari di sini)
+      c.usageHistory = c.jamNyalaHistory.map((jn,i)=>{
+        const monthsBack = bulanMundur-1-i;
+        const d = new Date(now.getFullYear(), now.getMonth()-monthsBack, 1);
+        const periode = BULAN_PENDEK[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
+        return { periode, daya: i===bulanMundur-1? c.dayaBulanIni : c.dayaBulanLalu, kwh: Math.round(jn*0.62), jamNyala: jn };
+      });
+    }
+    // Riwayat tahapan probing contoh — Mode Demo cuma punya satu snapshot status (bukan log
+    // per kunjungan sungguhan), jadi paling banyak ditampilkan satu entri dari data yang ada.
+    c.riwayatProbing = c.tanggalUpdateTerakhir ? [{ tanggal:c.tanggalUpdateTerakhir, status:c.statusProbing, catatan:c.catatanTerakhir, petugas:c.petugasProbing }] : [];
+  });
   return base;
 }
 function buildDemoProspek(){
@@ -1772,6 +2055,16 @@ function setLapanganMode(mode, btn){
   btn.classList.add('active');
   renderLapanganList();
 }
+// Kolom cari di atas daftar Probing Lapangan — cocokkan ke Nama ATAU IDPEL, tidak peka
+// huruf besar/kecil, dan tidak mempedulikan tab "Kunjungan Hari Ini"/"Semua Target" mana
+// yang sedang aktif (renderLapanganList() menerapkan pencarian ini di atas daftar yang
+// sudah difilter mode+Filter Lanjutan).
+function onLapanganSearchInput(value){
+  lapanganSearchQuery = (value||'').trim().toLowerCase();
+  const clearBtn = document.getElementById('lapanganSearchClear');
+  if(clearBtn) clearBtn.style.display = lapanganSearchQuery ? 'flex' : 'none';
+  renderLapanganList();
+}
 function badgeClassOf(statusKey){ return statusKey; } // 'belum'|'proses'|'selesai'|'ditolak' -> lihat CSS .badge.new/.progress/.done/.rejected
 function badgeCssClass(statusKey){
   return statusKey==='belum'?'new':statusKey==='proses'?'progress':statusKey==='selesai'?'done':'rejected';
@@ -1790,17 +2083,35 @@ function renderLapanganList(){
     list = allTargets;
     if(countEl) countEl.textContent = list.length+' target terdaftar · ketuk untuk buka detail kunjungan';
   }
+
+  // Simpan nomor urut rencana kunjungan yang ASLI (sebelum disaring pencarian) di tiap
+  // pelanggan, supaya kalau petugas mencari nama/ID tertentu, badge urutannya tetap
+  // menunjukkan urutan sesungguhnya di rencana kunjungan — bukan diurutkan ulang 1,2,3
+  // dari hasil pencarian yang bisa menyesatkan ("kunjungan ke-1" padahal aslinya ke-5).
+  list.forEach((c,idx)=>{ c._lapanganOrder = idx+1; });
+
+  const totalBeforeSearch = list.length;
+  if(lapanganSearchQuery){
+    list = list.filter(c=>
+      (c.name && c.name.toLowerCase().includes(lapanganSearchQuery)) ||
+      (c.idpel && String(c.idpel).toLowerCase().includes(lapanganSearchQuery))
+    );
+    if(countEl) countEl.textContent = list.length+' dari '+totalBeforeSearch+' pelanggan cocok dengan pencarian "'+lapanganSearchQuery+'"';
+  }
+
   if(list.length===0){
-    wrap.innerHTML = '<div class="empty-note">Belum ada rencana kunjungan. Atur target dan filternya dulu di tab Mapping Target.</div>';
+    wrap.innerHTML = lapanganSearchQuery
+      ? '<div class="empty-note">Tidak ada pelanggan dengan nama/ID yang cocok dengan pencarian ini.</div>'
+      : '<div class="empty-note">Belum ada rencana kunjungan. Atur target dan filternya dulu di tab Mapping Target.</div>';
     return;
   }
-  list.forEach((c,idx)=>{
+  list.forEach((c)=>{
     const dist = startPoint==='gps' ? c.distGps : c.distOffice;
     const el = document.createElement('div');
     el.className = 'cust-card clickable';
     el.onclick = ()=>openLapanganDetail(c.idpel);
     el.innerHTML =
-      (lapanganMode==='today' ? '<div class="order-badge">'+(idx+1)+'</div>' : '')+
+      (lapanganMode==='today' ? '<div class="order-badge">'+c._lapanganOrder+'</div>' : '')+
       '<div class="cust-avatar">'+c.initials+'</div>'+
       '<div class="cust-info">'+
         '<div class="name">'+escapeHtml(c.name)+'</div>'+
@@ -1853,6 +2164,14 @@ function openLapanganDetail(idpel){
   const wazeHref = hasCoord ? 'https://waze.com/ul?ll='+c.lat+','+c.lng+'&navigate=yes' : '';
   const waHref = c.kontak1 ? 'https://wa.me/62'+teleponHref.replace(/^0/,'') : '';
 
+  // Foto Rumah — dicocokkan dari indeks folder Drive "Foto Paska" (dimuat sekali per
+  // reloadAllData() lewat loadFotoPaskaIndex()) berdasarkan ID Pelanggan yang terkandung di
+  // nama file. Kalau tidak ketemu, tab Foto menyediakan tombol ambil/unggah manual yang
+  // otomatis mengunggah ke folder yang sama supaya tersinkron sendiri di kunjungan berikutnya.
+  const isPasca = c.jenisPelanggan === 'pascabayar';
+  const paskaMatch = findFotoPaska(c.idpel);
+  const rumahPhotoUrl = paskaMatch ? fotoPaskaViewUrl(paskaMatch.id) : '';
+
   dv.innerHTML =
     '<button class="back-btn" onclick="closeLapanganDetail()"><span class="msr" aria-hidden="true">arrow_back</span> Kembali</button>'+
     '<div class="detail-card">'+
@@ -1862,67 +2181,159 @@ function openLapanganDetail(idpel){
         '<span class="prio-tag '+c.priority+'" style="margin-top:0;">Prioritas '+(c.priority==='tinggi'?'Tinggi':'Sedang')+'</span>'+
       '</div>'+
 
-      '<div class="detail-photo-box" id="detailPhotoBox">'+
-        (c.foto ?
-          '<img src="'+escapeAttr(c.foto)+'" onerror="this.parentNode.innerHTML=\'<div class=&quot;photo-placeholder&quot;><span class=&quot;msr photo-cam&quot; aria-hidden=&quot;true&quot;>photo_camera</span><span>Foto tersimpan — <a href=&quot;'+escapeAttr(c.foto)+'&quot; target=&quot;_blank&quot;>lihat di Drive</a></span></div>\'">'
+      '<div class="detail-photo-box" id="fotoRumahBox">'+
+        (rumahPhotoUrl ?
+          '<img src="'+escapeAttr(rumahPhotoUrl)+'" onerror="this.parentNode.innerHTML=\'<div class=&quot;photo-placeholder&quot;><span class=&quot;msr photo-cam&quot; aria-hidden=&quot;true&quot;>photo_camera</span><span>Foto rumah tersimpan — <a href=&quot;'+escapeAttr(rumahPhotoUrl)+'&quot; target=&quot;_blank&quot;>lihat di Drive</a></span></div>\'">'
           :
-          '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>Belum ada foto</span></div>'
+          '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>'+(fotoPaskaLoaded ? 'Belum ada foto rumah — buka tab Foto' : 'Memuat foto rumah…')+'</span></div>'
         )+
       '</div>'+
       '<div class="detail-actions-row">'+
-        '<button type="button" class="action-btn" onclick="triggerFotoPicker()"><span class="ic msr" aria-hidden="true">photo_camera</span><span>Foto</span></button>'+
         '<a class="action-btn'+(c.kontak1?'':' disabled')+'" href="'+(c.kontak1?'tel:'+teleponHref:'#')+'"><span class="ic msr" aria-hidden="true">call</span><span>Telepon</span></a>'+
         '<a class="action-btn'+(waHref?'':' disabled')+'" href="'+(waHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">chat</span><span>WhatsApp</span></a>'+
         '<a class="action-btn'+(hasCoord?'':' disabled')+'" href="'+(mapsHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">directions</span><span>Maps</span></a>'+
         '<a class="action-btn'+(hasCoord?'':' disabled')+'" href="'+(wazeHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">navigation</span><span>Waze</span></a>'+
       '</div>'+
 
-      '<div class="section-title" style="margin-top:0;">Alasan Jadi Target</div>'+
-      '<div class="meta">'+reasonText+'</div>'+
-      '<div class="kv-row"><span class="k">ID Pelanggan</span><span class="v">'+escapeHtml(c.idpel)+'</span></div>'+
-      '<div class="kv-row"><span class="k">Telepon</span><span class="v">'+(c.kontak1? escapeHtml(c.kontak1) : '-')+'</span></div>'+
-      '<div class="kv-row"><span class="k">Daya saat ini</span><span class="v">'+c.daya+' VA'+(c.tarif?(' · '+escapeHtml(c.tarif)):'')+'</span></div>'+
-      (saran? '<div class="kv-row"><span class="k">Estimasi Daya Tersambung</span><span class="v">'+saran+' VA</span></div>' : '')+
-      (saran? '<div class="kv-row"><span class="k">Estimasi Biaya Penyambungan</span><span class="v">'+
-        (estimasiBiaya!=null ? formatRupiah(estimasiBiaya) : '<span style="font-weight:400;color:var(--text-muted);font-size:11px;">belum diatur · <a href="#" onclick="backToSetup();return false;">isi di Pengaturan</a></span>')+
-      '</span></div>' : '')+
-      '<div class="kv-row"><span class="k">Alamat</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.addr||'')+'</span></div>'+
-      (c.tanggalUpdateTerakhir? '<div class="kv-row"><span class="k">Update terakhir</span><span class="v">'+escapeHtml(String(c.tanggalUpdateTerakhir))+(c.petugasProbing?(' · '+escapeHtml(c.petugasProbing)):'')+'</span></div>' : '')+
-      (c.catatanTerakhir? '<div class="kv-row"><span class="k">Catatan terakhir</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.catatanTerakhir)+'</span></div>' : '')+
-      // Rincian biaya yang SUDAH TERCATAT (bukan estimasi) — cuma tampil kalau memang sudah
-      // ada Biaya Penyambungan tersimpan dari kunjungan sebelumnya. Diskon & Promo cuma
-      // muncul kalau diisi, supaya tidak bikin sesak tampilan pelanggan yang tidak dapat promo.
-      (c.biayaPenyambungan? '<div class="kv-row"><span class="k">Biaya Penyambungan (sebelum diskon)</span><span class="v">'+formatRupiah(parseRupiah(c.biayaPenyambungan))+'</span></div>' : '')+
-      (c.diskon? '<div class="kv-row"><span class="k">Diskon</span><span class="v">-'+formatRupiah(parseRupiah(c.diskon))+'</span></div>' : '')+
-      (c.promo? '<div class="kv-row"><span class="k">Promo</span><span class="v">'+escapeHtml(c.promo)+'</span></div>' : '')+
-      (c.biayaPenyambungan && c.diskon? '<div class="kv-row"><span class="k" style="font-weight:600;">Total Setelah Diskon</span><span class="v" style="font-weight:600;">'+formatRupiah(biayaBersih)+'</span></div>' : '')+
+      '<div class="detail-tabs">'+
+        '<button type="button" class="detail-tab active" data-tab="info" onclick="switchDetailTab(\'info\')">Info</button>'+
+        '<button type="button" class="detail-tab" data-tab="foto" onclick="switchDetailTab(\'foto\')">Foto</button>'+
+        '<button type="button" class="detail-tab" data-tab="pemakaian" onclick="switchDetailTab(\'pemakaian\')">Pemakaian</button>'+
+        '<button type="button" class="detail-tab" data-tab="riwayat" onclick="switchDetailTab(\'riwayat\')">Riwayat</button>'+
+      '</div>'+
 
-      '<div class="form-block">'+
-        '<div class="section-title" style="margin-top:0;">Catat Hasil Kunjungan</div>'+
-        '<label>Status Probing</label>'+
-        '<select id="vfStatus">'+STATUS_OPTIONS.map(s=>'<option value="'+s+'"'+(c.statusProbing===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
-        '<label>Tanggal Kunjungan</label>'+
-        '<input id="vfTanggal" type="date" value="'+escapeAttr(validDateOrToday(c.tanggalUpdateTerakhir))+'" max="'+todayStr()+'">'+
-        '<div class="field-hint">Kalau ini catatan kunjungan lama (dari luar aplikasi), ubah tanggalnya sesuai kapan pelanggan benar-benar diprobing.</div>'+
-        '<label>Catatan</label>'+
-        '<textarea id="vfCatatan" rows="3" placeholder="Catatan hasil kunjungan…">'+escapeHtml(c.catatanTerakhir||'')+'</textarea>'+
-        '<label>Target Daya (VA)</label>'+
-        '<select id="vfTargetDaya" onchange="onTargetDayaChange(\''+idpel+'\')">'+
-          (targetOptions.length ? targetOptions.map(t=>'<option value="'+t+'"'+(String(currentTarget)===String(t)?' selected':'')+'>'+t+' VA</option>').join('') : '<option value="">(tidak ada tingkat lebih tinggi)</option>')+
-        '</select>'+
-        '<label>Biaya Penyambungan (Rp)</label>'+
-        '<input id="vfBiaya" type="text" inputmode="numeric" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi" oninput="updateBiayaBersihHint()">'+
-        (!c.biayaPenyambungan && estimasiBiaya!=null ? '<div class="field-hint" style="margin-top:-10px;">Terisi otomatis dari tabel tangga biaya di Pengaturan sesuai Target Daya di atas — sesuaikan setelah biaya sebenarnya diketahui.</div>' : '')+
-        '<label>Diskon (Rp)</label>'+
-        '<input id="vfDiskon" type="text" inputmode="numeric" value="'+escapeAttr(c.diskon||'')+'" placeholder="0 (kosongkan kalau tidak ada)" oninput="updateBiayaBersihHint()">'+
-        '<label>Promo / Program Tematik</label>'+
-        '<input id="vfPromo" type="text" value="'+escapeAttr(c.promo||'')+'" placeholder="mis. Promo HUT PLN Agustus 2026">'+
-        '<div class="field-hint" id="vfBiayaBersihHint" style="display:'+(parseRupiah(c.diskon)>0?'':'none')+';">'+(parseRupiah(c.diskon)>0?('Setelah diskon: '+formatRupiah(biayaBersih)):'')+'</div>'+
-        '<input id="vfFoto" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleFotoPicked(this)">'+
-        '<button class="save-btn" id="vfSaveBtn" onclick="saveVisitOutcome(\''+idpel+'\')">Simpan Hasil Kunjungan</button>'+
-        '<div class="status-msg" id="vfMsg"></div>'+
+      '<div class="detail-tab-panel" data-panel="info">'+
+        '<div class="section-title" style="margin-top:0;">Alasan Jadi Target</div>'+
+        '<div class="meta">'+reasonText+'</div>'+
+        '<div class="kv-row"><span class="k">ID Pelanggan</span><span class="v">'+escapeHtml(c.idpel)+'</span></div>'+
+        '<div class="kv-row"><span class="k">Telepon</span><span class="v">'+(c.kontak1? escapeHtml(c.kontak1) : '-')+'</span></div>'+
+        '<div class="kv-row"><span class="k">Daya saat ini</span><span class="v">'+c.daya+' VA'+(c.tarif?(' · '+escapeHtml(c.tarif)):'')+'</span></div>'+
+        (saran? '<div class="kv-row"><span class="k">Estimasi Daya Tersambung</span><span class="v">'+saran+' VA</span></div>' : '')+
+        (saran? '<div class="kv-row"><span class="k">Estimasi Biaya Penyambungan</span><span class="v">'+
+          (estimasiBiaya!=null ? formatRupiah(estimasiBiaya) : '<span style="font-weight:400;color:var(--text-muted);font-size:11px;">belum diatur · <a href="#" onclick="backToSetup();return false;">isi di Pengaturan</a></span>')+
+        '</span></div>' : '')+
+        '<div class="kv-row"><span class="k">Alamat</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.addr||'')+'</span></div>'+
+        (c.tanggalUpdateTerakhir? '<div class="kv-row"><span class="k">Update terakhir</span><span class="v">'+escapeHtml(String(c.tanggalUpdateTerakhir))+(c.petugasProbing?(' · '+escapeHtml(c.petugasProbing)):'')+'</span></div>' : '')+
+        (c.catatanTerakhir? '<div class="kv-row"><span class="k">Catatan terakhir</span><span class="v" style="text-align:right;max-width:60%;">'+escapeHtml(c.catatanTerakhir)+'</span></div>' : '')+
+        // Rincian biaya yang SUDAH TERCATAT (bukan estimasi) — cuma tampil kalau memang sudah
+        // ada Biaya Penyambungan tersimpan dari kunjungan sebelumnya. Diskon & Promo cuma
+        // muncul kalau diisi, supaya tidak bikin sesak tampilan pelanggan yang tidak dapat promo.
+        (c.biayaPenyambungan? '<div class="kv-row"><span class="k">Biaya Penyambungan (sebelum diskon)</span><span class="v">'+formatRupiah(parseRupiah(c.biayaPenyambungan))+'</span></div>' : '')+
+        (c.diskon? '<div class="kv-row"><span class="k">Diskon</span><span class="v">-'+formatRupiah(parseRupiah(c.diskon))+'</span></div>' : '')+
+        (c.promo? '<div class="kv-row"><span class="k">Promo</span><span class="v">'+escapeHtml(c.promo)+'</span></div>' : '')+
+        (c.biayaPenyambungan && c.diskon? '<div class="kv-row"><span class="k" style="font-weight:600;">Total Setelah Diskon</span><span class="v" style="font-weight:600;">'+formatRupiah(biayaBersih)+'</span></div>' : '')+
+
+        '<div class="form-block">'+
+          '<div class="section-title" style="margin-top:0;">Catat Hasil Kunjungan</div>'+
+          '<label>Status Probing</label>'+
+          '<select id="vfStatus">'+STATUS_OPTIONS.map(s=>'<option value="'+s+'"'+(c.statusProbing===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
+          '<label>Tanggal Kunjungan</label>'+
+          '<input id="vfTanggal" type="date" value="'+escapeAttr(validDateOrToday(c.tanggalUpdateTerakhir))+'" max="'+todayStr()+'">'+
+          '<div class="field-hint">Kalau ini catatan kunjungan lama (dari luar aplikasi), ubah tanggalnya sesuai kapan pelanggan benar-benar diprobing.</div>'+
+          '<label>Catatan</label>'+
+          '<textarea id="vfCatatan" rows="3" placeholder="Catatan hasil kunjungan…">'+escapeHtml(c.catatanTerakhir||'')+'</textarea>'+
+          '<label>Target Daya (VA)</label>'+
+          '<select id="vfTargetDaya" onchange="onTargetDayaChange(\''+idpel+'\')">'+
+            (targetOptions.length ? targetOptions.map(t=>'<option value="'+t+'"'+(String(currentTarget)===String(t)?' selected':'')+'>'+t+' VA</option>').join('') : '<option value="">(tidak ada tingkat lebih tinggi)</option>')+
+          '</select>'+
+          '<label>Biaya Penyambungan (Rp)</label>'+
+          '<input id="vfBiaya" type="text" inputmode="numeric" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi" oninput="updateBiayaBersihHint()">'+
+          (!c.biayaPenyambungan && estimasiBiaya!=null ? '<div class="field-hint" style="margin-top:-10px;">Terisi otomatis dari tabel tangga biaya di Pengaturan sesuai Target Daya di atas — sesuaikan setelah biaya sebenarnya diketahui.</div>' : '')+
+          '<label>Diskon (Rp)</label>'+
+          '<input id="vfDiskon" type="text" inputmode="numeric" value="'+escapeAttr(c.diskon||'')+'" placeholder="0 (kosongkan kalau tidak ada)" oninput="updateBiayaBersihHint()">'+
+          '<label>Promo / Program Tematik</label>'+
+          '<input id="vfPromo" type="text" value="'+escapeAttr(c.promo||'')+'" placeholder="mis. Promo HUT PLN Agustus 2026">'+
+          '<div class="field-hint" id="vfBiayaBersihHint" style="display:'+(parseRupiah(c.diskon)>0?'':'none')+';">'+(parseRupiah(c.diskon)>0?('Setelah diskon: '+formatRupiah(biayaBersih)):'')+'</div>'+
+          '<button class="save-btn" id="vfSaveBtn" onclick="saveVisitOutcome(\''+idpel+'\')">Simpan Hasil Kunjungan</button>'+
+          '<div class="status-msg" id="vfMsg"></div>'+
+        '</div>'+
+      '</div>'+
+
+      '<div class="detail-tab-panel" data-panel="foto" style="display:none;">'+
+        '<div class="foto-sub-block">'+
+          '<div class="subsection-title">Foto Rumah</div>'+
+          (!isPasca ? '<div class="foto-sync-note">Sinkron otomatis dari folder Drive "Foto Paska" berlaku untuk pelanggan Pascabayar. Anda tetap bisa mengambil/mengunggah foto manual di bawah ini.</div>' : '')+
+          (paskaMatch ?
+            '<div class="foto-sync-note ok"><span class="msr" aria-hidden="true" style="font-size:13px;vertical-align:-2px;">cloud_done</span> Ditemukan otomatis dari folder Google Drive "Foto Paska" (dicocokkan lewat ID Pelanggan). Unggah foto baru di bawah untuk menggantinya.</div>'
+            :
+            '<div class="foto-sync-note">Belum ditemukan foto rumah yang cocok di folder Drive "Foto Paska". Ambil foto langsung atau unggah dari galeri — foto akan otomatis tersinkron untuk kunjungan berikutnya.</div>'
+          )+
+          '<button type="button" class="small-action-btn" onclick="triggerFotoRumahPicker()"><span class="msr" aria-hidden="true">add_a_photo</span><span>'+(paskaMatch?'Ganti Foto Rumah':'Ambil / Unggah Foto Rumah')+'</span></button>'+
+          '<input id="vfFotoRumah" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleFotoRumahPicked(this,\''+idpel+'\')">'+
+          '<div class="status-msg" id="fotoRumahMsg"></div>'+
+        '</div>'+
+        '<div class="foto-sub-block">'+
+          '<div class="subsection-title">Foto Kunjungan</div>'+
+          '<div class="foto-sync-note">Foto saat kunjungan lapangan — ikut tersimpan ke Google Sheets saat menekan "Simpan Hasil Kunjungan" di tab Info.</div>'+
+          '<div class="detail-photo-box" id="fotoKunjunganBox" style="height:150px;">'+
+            (c.foto ?
+              '<img src="'+escapeAttr(c.foto)+'" onerror="this.parentNode.innerHTML=\'<div class=&quot;photo-placeholder&quot;><span class=&quot;msr photo-cam&quot; aria-hidden=&quot;true&quot;>photo_camera</span><span>Foto tersimpan — <a href=&quot;'+escapeAttr(c.foto)+'&quot; target=&quot;_blank&quot;>lihat di Drive</a></span></div>\'">'
+              :
+              '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>Belum ada foto kunjungan</span></div>'
+            )+
+          '</div>'+
+          '<button type="button" class="small-action-btn" onclick="triggerFotoPicker()"><span class="ic msr" aria-hidden="true">photo_camera</span><span>Foto / Unggah Kunjungan</span></button>'+
+          '<input id="vfFoto" type="file" accept="image/*" capture="environment" style="display:none;" onchange="handleFotoPicked(this)">'+
+        '</div>'+
+      '</div>'+
+
+      '<div class="detail-tab-panel" data-panel="pemakaian" style="display:none;">'+
+        '<div class="section-title" style="margin-top:0;">Riwayat Jam Nyala (per bulan)</div>'+
+        '<div class="usage-chart-box">'+buildJamNyalaChartSvg((c.usageHistory||[]).slice(-6))+'</div>'+
+        '<div class="section-title">Riwayat Perubahan Daya</div>'+
+        buildUsageHistoryTable(c.usageHistory||[])+
+      '</div>'+
+
+      '<div class="detail-tab-panel" data-panel="riwayat" style="display:none;">'+
+        '<div class="section-title" style="margin-top:0;">Riwayat Tahapan Probing</div>'+
+        (riwayatSheetMissing && !DEMO_MODE ? '<div class="foto-sync-note">Tab "Riwayat Probing" belum ada di spreadsheet — riwayat kunjungan baru akan mulai tercatat setelah tab ini ditambahkan. Lihat panduan setup.</div>' : '')+
+        buildRiwayatProbingTimeline(c.riwayatProbing||[])+
       '</div>'+
     '</div>';
+}
+// Ganti tab aktif di kartu detail Probing Lapangan (Info | Foto | Pemakaian | Riwayat) —
+// murni tampilan (toggle display), semua isi tetap ada di DOM yang sama supaya form "Catat
+// Hasil Kunjungan" di tab Info tidak kehilangan isian saat berpindah tab untuk lihat Foto/Pemakaian.
+function switchDetailTab(tab){
+  const dv = document.getElementById('lapanganDetailView');
+  if(!dv) return;
+  dv.querySelectorAll('.detail-tab').forEach(b=> b.classList.toggle('active', b.getAttribute('data-tab')===tab));
+  dv.querySelectorAll('.detail-tab-panel').forEach(p=> p.style.display = (p.getAttribute('data-panel')===tab ? 'block' : 'none'));
+}
+function triggerFotoRumahPicker(){
+  const inp = document.getElementById('vfFotoRumah');
+  if(inp) inp.click();
+}
+// Unggah foto rumah manual (fallback saat tidak ada/tidak cocok di folder "Foto Paska") —
+// LANGSUNG diunggah saat dipilih (bukan menunggu tombol "Simpan Hasil Kunjungan"), karena foto
+// ini murni disimpan ke Drive, bukan ke baris Progres Probing. Nama filenya sengaja disisipi
+// ID Pelanggan supaya begitu diunggah, findFotoPaska() langsung bisa mencocokkannya lagi
+// (baik di sesi ini lewat fotoPaskaFiles.push(), maupun di kunjungan berikutnya dari device lain).
+async function handleFotoRumahPicked(input, idpel){
+  if(!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const box = document.getElementById('fotoRumahBox');
+  const msg = document.getElementById('fotoRumahMsg');
+  if(msg){ msg.className='status-msg'; msg.textContent=''; }
+  const localUrl = URL.createObjectURL(file);
+  if(box) box.innerHTML = '<img src="'+localUrl+'">'+'<div class="photo-pending-note"><span class="msr" aria-hidden="true" style="font-size:14px;">cloud_upload</span> Mengunggah ke Google Drive…</div>';
+
+  if(DEMO_MODE){
+    if(msg){ msg.className='status-msg err'; msg.textContent='Mode Demo tidak menyimpan ke Google Drive sungguhan.'; }
+    return;
+  }
+  try{
+    const folderId = (CFG.fotoPaskaFolder||'').trim() || FOTO_PASKA_FOLDER_ID_DEFAULT;
+    const filename = idpel+'_manual_'+Date.now()+'_'+file.name;
+    const result = await uploadFileToDrive(file, folderId, filename);
+    fotoPaskaFiles.push({ id: result.id, name: filename });
+    if(box) box.innerHTML = '<img src="'+result.url+'">';
+    if(msg){ msg.className='status-msg ok'; msg.textContent='Foto rumah tersimpan ke folder "Foto Paska" — otomatis tersinkron untuk kunjungan berikutnya.'; }
+  }catch(err){
+    console.error(err);
+    if(box) box.innerHTML = '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>Gagal mengunggah foto</span></div>';
+    if(msg){ msg.className='status-msg err'; msg.textContent='Gagal mengunggah: '+(err.message||String(err)); }
+  }
 }
 // Dipanggil saat dropdown Target Daya diganti — cari ulang estimasi biaya yang PERSIS
 // cocok untuk kombinasi (daya sekarang → target baru) dari tabel tangga biaya di
@@ -1963,7 +2374,7 @@ function triggerFotoPicker(){
 function handleFotoPicked(input){
   if(!input.files || !input.files[0]) return;
   const url = URL.createObjectURL(input.files[0]);
-  const box = document.getElementById('detailPhotoBox');
+  const box = document.getElementById('fotoKunjunganBox');
   if(box){
     box.innerHTML = '<img src="'+url+'">'+
       '<div class="photo-pending-note"><span class="msr" aria-hidden="true" style="font-size:14px;">check_circle</span> Foto siap — klik "Simpan Hasil Kunjungan" untuk mengunggah</div>';
@@ -2036,6 +2447,24 @@ async function saveVisitOutcome(idpel){
       await sheetsAppendRow(SHEET_NAMES.progres, rowValues);
     }
 
+    // Catat juga ke log "Riwayat Probing" (append-only, TIDAK menimpa baris manapun) supaya
+    // tab "Riwayat" di kartu detail bisa menampilkan tahapan probing dari waktu ke waktu, bukan
+    // cuma status terkini seperti "Progres Probing". Kalau tab ini belum ada di spreadsheet
+    // (spreadsheet lama), gagal diam-diam — jangan sampai menggagalkan penyimpanan hasil
+    // kunjungan yang sebenarnya (yang lebih penting) hanya karena log tambahan ini gagal.
+    const riwayatEntry = { tanggal, status, catatan, petugas: (APP_USER&&APP_USER.name)||'' };
+    try{
+      const riwayatHeader = SHEET_HEADERS.riwayat && SHEET_HEADERS.riwayat.length ? SHEET_HEADERS.riwayat : RIWAYAT_HEADER_DEFAULT;
+      const riwayatValueMap = { 'IDPEL': idpel, 'Tanggal': tanggal, 'Status Probing': status, 'Catatan': catatan, 'Petugas': riwayatEntry.petugas };
+      const riwayatRowValues = riwayatHeader.map(h=> riwayatValueMap[h]!==undefined ? riwayatValueMap[h] : '');
+      await sheetsAppendRow(SHEET_NAMES.riwayat, riwayatRowValues);
+      riwayatSheetMissing = false;
+    }catch(e){
+      console.warn('Gagal menambah baris ke "Riwayat Probing" (mungkin tab ini belum ada di spreadsheet):', e);
+      riwayatSheetMissing = true;
+    }
+    c.riwayatProbing = [riwayatEntry].concat(c.riwayatProbing||[]);
+
     c.statusProbing = status; c.catatanTerakhir = catatan; c.tanggalUpdateTerakhir = tanggal;
     c.targetDayaVA = targetDaya; c.biayaPenyambungan = biaya; c.diskon = diskon; c.promo = promo; c.foto = fotoLink;
     c.petugasProbing = (APP_USER&&APP_USER.name)||'';
@@ -2053,9 +2482,14 @@ async function saveVisitOutcome(idpel){
   }
 }
 
-async function uploadPhotoToDrive(file, idpel){
-  const metadata = { name: 'RADAR_'+idpel+'_'+Date.now()+'_'+file.name };
-  if(CFG.driveFolder) metadata.parents = [CFG.driveFolder];
+// Fungsi generik unggah berkas ke Google Drive — dipakai baik oleh uploadPhotoToDrive()
+// (foto kunjungan, ke CFG.driveFolder) maupun handleFotoRumahPicked() (foto rumah fallback
+// manual, ke folder "Foto Paska"), supaya logika multipart-upload + set izin publik hanya
+// ada di satu tempat. Mengembalikan {id, url} — "url" sudah bentuk direct-view (bukan
+// webViewLink) supaya bisa langsung dipakai sebagai src <img>.
+async function uploadFileToDrive(file, folderId, filename){
+  const metadata = { name: filename };
+  if(folderId) metadata.parents = [folderId];
   const boundary = '-------radar'+Math.random().toString(16).slice(2);
   const delim = '\r\n--'+boundary+'\r\n';
   const closeDelim = '\r\n--'+boundary+'--';
@@ -2070,7 +2504,7 @@ async function uploadPhotoToDrive(file, idpel){
     headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'multipart/related; boundary='+boundary },
     body: multipartBody
   });
-  if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('Gagal unggah foto ke Drive (HTTP '+res.status+'). '+t.slice(0,200)); }
+  if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('Gagal unggah ke Drive (HTTP '+res.status+'). '+t.slice(0,200)); }
   const data = await res.json();
 
   // "webViewLink" (halaman viewer Drive) TIDAK BISA dipakai langsung sebagai src <img> —
@@ -2087,9 +2521,14 @@ async function uploadPhotoToDrive(file, idpel){
       headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' },
       body: JSON.stringify({ role:'reader', type:'anyone' })
     });
-  }catch(e){ console.warn('Gagal set izin publik foto Drive:', e); }
+  }catch(e){ console.warn('Gagal set izin publik file Drive:', e); }
 
-  return 'https://drive.google.com/uc?export=view&id='+data.id;
+  return { id: data.id, url: 'https://drive.google.com/uc?export=view&id='+data.id };
+}
+async function uploadPhotoToDrive(file, idpel){
+  const filename = 'RADAR_'+idpel+'_'+Date.now()+'_'+file.name;
+  const result = await uploadFileToDrive(file, CFG.driveFolder, filename);
+  return result.url;
 }
 function fileToBase64(file){
   return new Promise((resolve,reject)=>{
