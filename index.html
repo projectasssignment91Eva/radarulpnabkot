@@ -256,6 +256,7 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .tag{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; background:#eef1f4; color:var(--text-secondary); padding:3px 9px; border-radius:999px; font-weight:600; line-height:1.4; }
 .tag .msr{ font-size:12px; }
 .tag-alert{ background:#fde2e1; color:#a3211f; }
+.tag-digital{ background:#dff0fd; color:#00577f; }
 .meta{ font-size:12px; color:var(--text-secondary); margin-bottom:3px; }
 .addr{ font-size:11.5px; color:var(--text-muted); }
 .prio-tag{ display:inline-block; font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; margin-top:6px; }
@@ -360,6 +361,9 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .prospek-idpel-missing{ color:var(--text-muted); font-style:italic; }
 .prospek-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin-bottom:8px; background:#fff; }
 .prospek-edit-row .mf-input{ margin-bottom:8px; }
+.riwayat-wa-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin-bottom:8px; background:#fff; }
+.riwayat-wa-edit-row .mf-input{ margin-bottom:8px; }
+.ci-thumb.wa{ background:linear-gradient(135deg,#25D366,#128C7E); }
 .tip-item{ font-size:11.5px; line-height:1.5; color:var(--text-secondary); padding:8px 0; border-bottom:1px dashed var(--grid); }
 .tip-item:last-child{ border-bottom:none; }
 .tip-item b{ color:var(--pln-navy); margin-right:4px; }
@@ -592,6 +596,19 @@ table.trend-table tr:last-child td{ border-bottom:none; }
 
       <div class="section-title">Kirim Satu per Satu</div>
       <div id="waLinkList"></div>
+
+      <div class="section-title">Catat Riwayat Kirim WA</div>
+      <div class="manual-form">
+        <div class="hint" style="margin:0 0 8px;">RADAR belum punya integrasi WhatsApp Business API jadi tidak bisa tahu otomatis pesan mana yang benar-benar terkirim lewat tombol "Kirim" di atas — catat manual di sini kalau perlu direkam. Ini juga tempatnya untuk mencatat pesan yang sebenarnya SUDAH dikirim sebelumnya tapi belum sempat dicatat di sini: ubah saja Tanggal Kirim ke tanggal aslinya (backdate), tidak harus hari ini.</div>
+        <input class="mf-input" id="riwayatWaIdpel" placeholder="ID Pelanggan">
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tanggal kirim</label>
+        <input class="mf-input" id="riwayatWaTanggal" type="date">
+        <input class="mf-input" id="riwayatWaCatatan" placeholder="Catatan (opsional, mis. isi promo yang dikirim)">
+        <button class="mf-add-btn" onclick="saveRiwayatWa()">+ Catat Riwayat Kirim</button>
+      </div>
+      <div class="status-msg" id="riwayatWaMsg"></div>
+      <div class="section-title">Riwayat Tercatat</div>
+      <div id="riwayatWaList"></div>
     </div>
 
     <div class="sm-panel" id="digitalPanelSm">
@@ -605,6 +622,9 @@ table.trend-table tr:last-child td{ border-bottom:none; }
           <option>Instagram</option><option>Status WhatsApp Karyawan</option><option>Facebook/Media Sosial Lain</option>
         </select>
         <input class="mf-input" id="prospekCatatanSm" placeholder="Catatan (opsional)">
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tanggal prospek didapat</label>
+        <input class="mf-input" id="prospekTanggalSm" type="date">
+        <div class="hint" style="margin:-4px 0 8px;">Sudah pernah dapat/dihubungi prospek ini sebelumnya tapi belum sempat dicatat di sini? Ubah tanggalnya ke tanggal aslinya — tidak harus hari ini.</div>
         <button class="mf-add-btn" onclick="saveProspekManual('sm')">+ Tambah Prospek</button>
       </div>
       <div class="status-msg" id="prospekMsgSm"></div>
@@ -621,6 +641,9 @@ table.trend-table tr:last-child td{ border-bottom:none; }
         <input class="mf-input" id="prospekIdpelBe" placeholder="ID Pelanggan (isi kalau sudah tahu — kalau belum, boleh dikosongkan & diisi belakangan lewat Edit)">
         <input class="mf-input" id="prospekSumberBe" placeholder="Nama event/kode brosur (mis. Car Free Day Agustus)">
         <input class="mf-input" id="prospekCatatanBe" placeholder="Catatan (opsional)">
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tanggal prospek didapat</label>
+        <input class="mf-input" id="prospekTanggalBe" type="date">
+        <div class="hint" style="margin:-4px 0 8px;">Sudah pernah dapat/dihubungi prospek ini sebelumnya tapi belum sempat dicatat di sini? Ubah tanggalnya ke tanggal aslinya — tidak harus hari ini.</div>
         <button class="mf-add-btn" onclick="saveProspekManual('be')">+ Tambah Prospek</button>
       </div>
       <div class="status-msg" id="prospekMsgBe"></div>
@@ -733,6 +756,8 @@ let prospekList = [];         // prospek manual (Media Sosial & Brosur/Event), d
 let prospekSheetMissing = false; // true kalau spreadsheet belum punya tab "Prospek Manual"
 let riwayatSheetMissing = false; // true kalau spreadsheet belum punya tab "Riwayat Probing"
 let biayaTanggaSheetMissing = false; // true kalau spreadsheet belum punya tab "Estimasi Biaya"
+let riwayatWaList = [];       // log kirim pesan WhatsApp (termasuk yang dicatat backdate), dari sheet "Riwayat WhatsApp"
+let riwayatWaSheetMissing = false; // true kalau spreadsheet belum punya tab "Riwayat WhatsApp"
 let digitalSubtab = 'wa';
 
 // Nama tab disesuaikan persis dengan nama tab di Google Sheets master data sungguhan
@@ -748,7 +773,8 @@ const SHEET_NAMES = {
   updateDaya: 'Update Daya',
   prospek: 'Prospek Manual',
   riwayat: 'Riwayat Probing',
-  biayaTangga: 'Estimasi Biaya'
+  biayaTangga: 'Estimasi Biaya',
+  riwayatWa: 'Riwayat WhatsApp'
 };
 const PROSPEK_HEADER_DEFAULT = ['IDPEL','Nama','Telepon','Tipe','Sumber','Catatan','Tanggal','Petugas'];
 // "Riwayat Probing" adalah LOG tiap kali "Simpan Hasil Kunjungan" ditekan (append-only, baris
@@ -763,6 +789,13 @@ const RIWAYAT_HEADER_DEFAULT = ['IDPEL','Tanggal','Status Probing','Catatan','Pe
 // Lanjutan sambil sudah login; dibaca setiap reloadAllData() dan menimpa CFG.biayaNaikTingkat
 // lokal kalau tab ini punya data.
 const BIAYA_TANGGA_HEADER_DEFAULT = ['Dari (VA)','Ke (VA)','Biaya (Rp)'];
+// "Riwayat WhatsApp" mencatat pelanggan mana saja yang sudah dikirimi pesan WhatsApp marketing
+// tambah daya (append-only, satu baris per kali kirim/catat) — termasuk yang dikirim SEBELUM
+// RADAR dipakai (dicatat belakangan lewat form "Catat Riwayat Kirim WA", tanggalnya bisa
+// diubah ke tanggal lampau/backdate). RADAR sendiri tidak punya integrasi WhatsApp Business API
+// jadi tidak bisa tahu otomatis pesan mana yang benar-benar terkirim — log ini murni catatan
+// manual petugas.
+const RIWAYAT_WA_HEADER_DEFAULT = ['IDPEL','Nama','Tanggal','Catatan','Petugas'];
 const STATUS_OPTIONS = ['Belum Dikunjungi','Sudah Dikunjungi','Follow Up','Permohonan','Bayar','Tersambung','Ditolak','Tidak Bisa Dikunjungi'];
 // Folder Drive "Foto Paska" (foto rumah pelanggan Pascabayar, sudah ada sebelum RADAR dibuat)
 // milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
@@ -821,6 +854,14 @@ function initApp(){
   document.getElementById('cfgDriveFolder').value = CFG.driveFolder || '';
   document.getElementById('cfgFotoPaskaFolder').value = CFG.fotoPaskaFolder || FOTO_PASKA_FOLDER_ID_DEFAULT;
   document.getElementById('cfgKantor').value = (CFG.kantorLat!=null && CFG.kantorLng!=null) ? (CFG.kantorLat+', '+CFG.kantorLng) : '';
+
+  // Tanggal prospek default ke hari ini (petugas tinggal ubah ke tanggal lampau kalau mau
+  // mencatat prospek yang sebenarnya sudah didapat SEBELUM pakai RADAR — backdate) — dan tidak
+  // boleh diisi tanggal di masa depan.
+  ['prospekTanggalSm','prospekTanggalBe','riwayatWaTanggal'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.max = todayStr(); el.value = todayStr(); }
+  });
 
   if(CFG.spreadsheetId && CFG.clientId && ACCESS_TOKEN){
     hideAllGates();
@@ -1149,10 +1190,13 @@ async function reloadAllData(){
       prospekSheetMissing = false;
       fotoPaskaFiles = []; fotoPaskaLoaded = true; fotoPaskaLoadError = null;
       biayaTanggaSheetMissing = false;
+      riwayatWaList = buildDemoRiwayatWa();
+      riwayatWaSheetMissing = false;
     } else {
       const [sheets] = await Promise.all([ fetchAllSheets(), loadFotoPaskaIndex() ]);
       customers = buildCustomersFromSheets(sheets);
       prospekList = sheets.prospek || [];
+      riwayatWaList = sheets.riwayatWa || [];
       // Kalau tab "Estimasi Biaya" ada & sudah diisi setidaknya 1 baris data, timpa
       // CFG.biayaNaikTingkat lokal dengan nilai dari sheet ini — supaya petugas yang login di
       // perangkat BARU otomatis dapat tabel yang sudah diisi admin sebelumnya, tanpa perlu
@@ -1182,17 +1226,29 @@ async function reloadAllData(){
         }
       }
     }
+    // Sumber Probing Digital ditempelkan di sini secara terpusat (bukan di dalam
+    // buildCustomersFromSheets) supaya berlaku SAMA untuk Mode Demo maupun mode sungguhan —
+    // keduanya sudah punya prospekList/riwayatWaList terisi di titik ini (lihat cabang
+    // DEMO_MODE/real di atas).
+    const digitalSourceByIdpel = computeDigitalSourceByIdpel(prospekList, riwayatWaList);
     customers.forEach(c=>{
       const info = computeTargetInfo(c);
       c.priority = info.priority;
       c.srcJamNyala = info.srcJamNyala;
       c.srcDibatalkan = info.srcDibatalkan;
       c.jamNyalaFreq = info.freq;
+      // Sumber Probing Digital (kalau ada) — diurutkan tanggal menaik (kontak paling awal
+      // duluan), supaya "Alasan Jadi Target" bisa menunjukkan kontak PERTAMA yang membuat
+      // pelanggan ini masuk radar dari jalur digital, sekaligus menyimpan SEMUA kontak untuk
+      // konteks lengkap.
+      c.digitalSources = (digitalSourceByIdpel[c.idpel]||[]).slice().sort((a,b)=> String(a.tanggal).localeCompare(String(b.tanggal)));
+      c.srcDigital = c.digitalSources.length>0;
     });
     buildFilterSheetOptions();
     renderMappingList();
     renderLapanganList();
     renderWaSegment();
+    renderRiwayatWaList();
     renderProspekList('sm');
     renderProspekList('be');
     renderDashboard();
@@ -1340,6 +1396,21 @@ async function fetchAllSheets(){
     out.biayaTangga = null;
     SHEET_HEADERS.biayaTangga = BIAYA_TANGGA_HEADER_DEFAULT;
     biayaTanggaSheetMissing = true;
+  }
+
+  // "Riwayat WhatsApp" juga tab opsional (log kirim WA, termasuk yang dicatat backdate lewat
+  // tab WhatsApp di Probing Digital) — kalau spreadsheet lama belum punya tab ini, bagian
+  // "Riwayat Kirim WA" cuma menampilkan pesan pengingat, fitur WA lainnya tetap jalan normal.
+  try{
+    const riwayatWaRows = await sheetsGet(SHEET_NAMES.riwayatWa+'!A1:Z100000');
+    const parsed = rowsToObjects(riwayatWaRows);
+    out.riwayatWa = parsed.items;
+    SHEET_HEADERS.riwayatWa = parsed.header.length ? parsed.header : RIWAYAT_WA_HEADER_DEFAULT;
+    riwayatWaSheetMissing = false;
+  } catch(e){
+    out.riwayatWa = [];
+    SHEET_HEADERS.riwayatWa = RIWAYAT_WA_HEADER_DEFAULT;
+    riwayatWaSheetMissing = true;
   }
   return out;
 }
@@ -1529,6 +1600,20 @@ function buildCustomersFromSheets(sheets){
     });
   });
 
+  // Sumber lead Probing Digital (Prospek Manual — Media Sosial/Brosur-Event — dan Riwayat
+  // WhatsApp) yang ID Pel-nya sudah diketahui, dikelompokkan per IDPEL. Dipakai untuk: (a)
+  // menandai pelanggan yang jadi target KARENA pernah dihubungi lewat Probing Digital (bukan
+  // cuma karena lolos ambang jam nyala/pernah dibatalkan), supaya kartu pelanggannya tetap bisa
+  // dibuka di Probing Lapangan; dan (b) melacak realisasinya balik ke sumber digitalnya di
+  // Dashboard, begitu statusnya diupdate jadi Tersambung lewat alur Probing Lapangan yang sama
+  // seperti biasa (satu sumber kebenaran status tetap di Progres Probing — Probing Digital
+  // cuma menyimpan DARI MANA pelanggan itu berasal, bukan status probingnya sendiri).
+  // Dipakai di sini HANYA untuk menentukan pelanggan mana yang perlu disertakan ke daftar
+  // master (langkah 4 di bawah) — atribut c.digitalSources/c.srcDigital sendiri BARU
+  // ditempelkan belakangan secara terpusat di reloadAllData(), supaya Mode Demo (yang tidak
+  // lewat fungsi ini) tetap mendapat perlakuan yang sama persis, bukan cuma mode sungguhan.
+  const digitalSourceByIdpel = computeDigitalSourceByIdpel(sheets.prospek, sheets.riwayatWa);
+
   // agregasi Pascabayar per IDPEL, urut berdasarkan THBLREK menaik
   const pascaByIdpel = {};
   (sheets.pasca||[]).forEach(r=>{
@@ -1627,9 +1712,10 @@ function buildCustomersFromSheets(sheets){
     if(!rec.kontak1 && r['NOTELP_HP_PEMOHON']) rec.kontak1 = r['NOTELP_HP_PEMOHON'];
   });
 
-  // 4) hanya simpan pelanggan yang benar2 punya sinyal target (jam nyala ATAU pernah dibatalkan)
-  //    — filter definitif (bukan cuma sedang lolos threshold >500) dihitung lewat computeTargetInfo() nanti.
-  const list = Object.values(master).filter(c=> c.jenisPelanggan || c.permohonanDibatalkan);
+  // 4) hanya simpan pelanggan yang benar2 punya sinyal target (jam nyala ATAU pernah dibatalkan
+  //    ATAU sudah dihubungi lewat Probing Digital dan ID Pel-nya ketemu di Data Identitas) —
+  //    filter definitif (bukan cuma sedang lolos threshold >500) dihitung lewat computeTargetInfo() nanti.
+  const list = Object.values(master).filter(c=> c.jenisPelanggan || c.permohonanDibatalkan || digitalSourceByIdpel[c.idpel]);
 
   // 5) selipkan progres probing (status kunjungan) bila ada
   list.forEach(c=>{
@@ -1663,6 +1749,27 @@ function buildCustomersFromSheets(sheets){
   });
 
   return list;
+}
+
+// Dipakai baik oleh mode sungguhan (buildCustomersFromSheets, dari sheets.prospek/sheets.riwayatWa)
+// maupun Mode Demo (reloadAllData, dari prospekList/riwayatWaList hasil buildDemoProspek()/
+// buildDemoRiwayatWa()) — supaya kartu contoh di Mode Demo juga menunjukkan lencana & alasan
+// "Prospek Digital" persis seperti data sungguhan, bukan cuma di mode sungguhan saja.
+function computeDigitalSourceByIdpel(prospekArr, riwayatWaArr){
+  const byIdpel = {};
+  (prospekArr||[]).forEach(r=>{
+    const idpel = String(r['IDPEL']||'').trim();
+    if(!idpel) return;
+    if(!byIdpel[idpel]) byIdpel[idpel] = [];
+    byIdpel[idpel].push({ kanal: r['Tipe']||'Probing Digital', sumber: r['Sumber']||'', tanggal: r['Tanggal']||'', catatan: r['Catatan']||'' });
+  });
+  (riwayatWaArr||[]).forEach(r=>{
+    const idpel = String(r['IDPEL']||'').trim();
+    if(!idpel) return;
+    if(!byIdpel[idpel]) byIdpel[idpel] = [];
+    byIdpel[idpel].push({ kanal:'WhatsApp', sumber:'', tanggal: r['Tanggal']||'', catatan: r['Catatan']||'' });
+  });
+  return byIdpel;
 }
 
 function formatTanggal(v){
@@ -1837,6 +1944,15 @@ function buildDemoProspek(){
     { IDPEL:'', Nama:'Bpk. Joko Santoso', Telepon:'0812-0000-1111', Tipe:'Brosur/Event', Sumber:'Car Free Day Agustus', Catatan:'', Tanggal:'2026-08-02', Petugas:'Siti' }
   ];
 }
+// Contoh isi "Riwayat WhatsApp" untuk Mode Demo — termasuk contoh entri backdate (tanggal
+// jauh sebelum hari ini) supaya Mode Demo menunjukkan bagaimana hasilnya kalau petugas mencatat
+// pesan yang sebenarnya sudah dikirim sebelum pakai RADAR.
+function buildDemoRiwayatWa(){
+  return [
+    { IDPEL:'5401281193', Nama:'Bpk. Suryadi', Tanggal:'2026-06-02', Catatan:'Follow up minat naik daya', Petugas:'Ahmad' },
+    { IDPEL:'5401339287', Nama:'Ibu Rahmawati', Tanggal:'2026-07-10', Catatan:'Promo HUT PLN Agustus', Petugas:'Ahmad' }
+  ];
+}
 
 /* ---------------------------------------------------------------------
    8. TARGET LIST (filtered + sorted) — dipakai Mapping Target & Lapangan
@@ -1850,7 +1966,7 @@ function computeDistances(c){
 function getTargetList(){
   customers.forEach(computeDistances);
   let list = customers.filter(c=>
-    (c.srcJamNyala || c.srcDibatalkan || (filters.manualIds && filters.manualIds.includes(c.idpel)))
+    (c.srcJamNyala || c.srcDibatalkan || c.srcDigital || (filters.manualIds && filters.manualIds.includes(c.idpel)))
   );
   list = list.filter(c=>
     (filters.status==='all' || c.statusKey===filters.status) &&
@@ -1860,7 +1976,8 @@ function getTargetList(){
     (filters.tarif.length===0 || (c.tarif && filters.tarif.includes(String(c.tarif).charAt(0).toUpperCase()))) &&
     (filters.sumberTarget.length===0 ||
       (filters.sumberTarget.includes('jamnyala') && c.srcJamNyala) ||
-      (filters.sumberTarget.includes('dibatalkan') && c.srcDibatalkan)) &&
+      (filters.sumberTarget.includes('dibatalkan') && c.srcDibatalkan) ||
+      (filters.sumberTarget.includes('digital') && c.srcDigital)) &&
     (filters.petugas==='all' || c.petugas===filters.petugas) &&
     (!filters.manualIds || filters.manualIds.includes(c.idpel))
   );
@@ -2088,6 +2205,7 @@ function renderMappingList(){
             ? '<span class="tag"><span class="msr" aria-hidden="true">bolt</span> Prabayar · &gt;500 jam ('+escapeHtml(c.kategoriDurasi||'')+')</span>'
             : '<span class="tag"><span class="msr" aria-hidden="true">bolt</span> Jam Nyala '+Math.round(c.jamNyala)+' jam ('+c.jamNyalaFreq+'/6 bln)</span>') : '')+
           (c.srcDibatalkan ? '<span class="tag tag-alert"><span class="msr" aria-hidden="true">undo</span> Permohonan Dibatalkan</span>' : '')+
+          (c.srcDigital ? '<span class="tag tag-digital"><span class="msr" aria-hidden="true">chat</span> Prospek Digital</span>' : '')+
         '</div>'+
         '<div class="addr">'+escapeHtml(c.addr||'')+distText+'</div>'+
         '<span class="prio-tag '+c.priority+'">Prioritas '+(c.priority==='tinggi'?'Tinggi':'Sedang')+'</span>'+
@@ -2149,7 +2267,7 @@ function buildFilterSheetOptions(){
     // tempat. Warna pin di peta sendiri sekarang mengikuti Prioritas (lihat map-legend & pinColor()).
     '<div class="filter-group">'+fgLabel('Status Probing')+selectSingle('status',['belum','proses','selesai','ditolak'],filters.status, v=>statusLabel[v]||v)+'</div>'+
     '<div class="filter-group">'+fgLabel('Prioritas')+selectMulti('priority',['tinggi','sedang'],filters.priority, v=>v==='tinggi'?'Tinggi':'Sedang')+'</div>'+
-    '<div class="filter-group">'+fgLabel('Sumber Target')+selectMulti('sumberTarget',['jamnyala','dibatalkan'],filters.sumberTarget, v=>v==='jamnyala'?'Jam Nyala':'Dibatalkan')+'</div>'+
+    '<div class="filter-group">'+fgLabel('Sumber Target')+selectMulti('sumberTarget',['jamnyala','dibatalkan','digital'],filters.sumberTarget, v=>v==='jamnyala'?'Jam Nyala':v==='dibatalkan'?'Dibatalkan':'Probing Digital')+'</div>'+
     (dayaOpts.length? '<div class="filter-group">'+fgLabel('Daya Tersambung (VA)')+selectMulti('daya',dayaOpts,filters.daya, v=>v+' VA')+'</div>' : '')+
     (kogolOpts.length? '<div class="filter-group">'+fgLabel('Kode Golongan')+selectMulti('kogol',kogolOpts,filters.kogol)+'</div>' : '')+
     (tarifGroupOpts.length? '<div class="filter-group">'+fgLabel('Tarif')+selectMulti('tarif',tarifGroupOpts,filters.tarif, v=>v)+'</div>' : '')+
@@ -2206,7 +2324,7 @@ function switchTab(name){
   if(iconEl && sniIcon) iconEl.textContent = sniIcon.textContent;
   if(name==='mapping'){ renderMappingList(); }
   if(name==='lapangan' && !activeIdpel){ renderLapanganList(); }
-  if(name==='digital'){ renderWaSegment(); renderProspekList('sm'); renderProspekList('be'); }
+  if(name==='digital'){ renderWaSegment(); renderRiwayatWaList(); renderProspekList('sm'); renderProspekList('be'); }
   if(name==='dashboard'){ renderDashboard(); }
   if(name==='mapping' && map){ setTimeout(()=>map.invalidateSize(), 200); }
   closeSidebar();
@@ -2329,6 +2447,7 @@ function renderLapanganList(){
           '<span class="tag">ID '+escapeHtml(c.idpel)+'</span>'+
           (c.srcDibatalkan ? '<span class="tag tag-alert"><span class="msr" aria-hidden="true">undo</span> Dibatalkan</span>' : '')+
           (c.jenisPelanggan==='prabayar' ? '<span class="tag"><span class="msr" aria-hidden="true">bolt</span> Prabayar</span>' : '')+
+          (c.srcDigital ? '<span class="tag tag-digital"><span class="msr" aria-hidden="true">chat</span> Prospek Digital</span>' : '')+
         '</div>'+
         '<div class="addr">'+escapeHtml(c.addr||'')+(dist!=null?' · '+dist.toFixed(1)+' km':'')+'</div>'+
       '</div>'+
@@ -2351,6 +2470,17 @@ function openLapanganDetail(idpel){
     else reasons.push('Jam Nyala '+Math.round(c.jamNyala)+' jam/bulan ('+c.jamNyalaFreq+'/6 bulan terakhir &gt;500 jam)');
   }
   if(c.srcDibatalkan) reasons.push('Pernah mengajukan tambah daya, dibatalkan '+escapeHtml(c.tanggalPembatalan||''));
+  // Prospek yang berasal dari Probing Digital (Prospek Manual / Riwayat WhatsApp dengan ID Pel
+  // yang cocok) — ditampilkan di sini supaya realisasinya (begitu status diupdate lewat form di
+  // bawah) tetap bisa dilacak balik ke sumber digitalnya, bukan cuma tercatat sebagai target
+  // biasa. Kontak PERTAMA yang ditampilkan (c.digitalSources sudah diurutkan tanggal menaik);
+  // kalau pernah dihubungi lebih dari sekali, jumlah kontaknya ikut ditampilkan.
+  if(c.srcDigital && c.digitalSources && c.digitalSources.length){
+    const first = c.digitalSources[0];
+    const kanalLabel = escapeHtml(first.kanal||'Probing Digital')+(first.sumber?(' — '+escapeHtml(first.sumber)):'');
+    const extra = c.digitalSources.length>1 ? ' · '+c.digitalSources.length+'x kontak tercatat' : '';
+    reasons.push('Prospek dari Probing Digital — '+kanalLabel+(first.tanggal?(', '+escapeHtml(String(first.tanggal))):'')+extra);
+  }
   const reasonText = reasons.length ? reasons.join(' · ') : 'Ditambahkan manual (ID Pelanggan)';
 
   const dist = startPoint==='gps' ? c.distGps : c.distOffice;
@@ -2753,7 +2883,7 @@ function showDigitalSubtab(name, el){
   document.getElementById('digitalPanelWa').classList.toggle('active', name==='wa');
   document.getElementById('digitalPanelSm').classList.toggle('active', name==='sm');
   document.getElementById('digitalPanelBe').classList.toggle('active', name==='be');
-  if(name==='wa') renderWaSegment();
+  if(name==='wa'){ renderWaSegment(); renderRiwayatWaList(); }
   if(name==='sm') renderProspekList('sm');
   if(name==='be') renderProspekList('be');
 }
@@ -2911,6 +3041,151 @@ async function copyAllPhones(){
   }
 }
 
+/* -----------------------------------------------------------------------
+   Riwayat Kirim WA — log manual pelanggan yang sudah dikirimi pesan WhatsApp
+   marketing tambah daya, TERMASUK yang sudah dikirim SEBELUM pakai RADAR
+   (dicatat belakangan dengan tanggal lampau/backdate). RADAR tidak punya
+   integrasi WhatsApp Business API jadi tidak bisa tahu otomatis pesan mana
+   yang benar-benar terkirim lewat tombol "Kirim" (wa.me) — ini murni catatan
+   manual petugas, disimpan ke sheet "Riwayat WhatsApp".
+----------------------------------------------------------------------- */
+async function saveRiwayatWa(){
+  const idpelEl = document.getElementById('riwayatWaIdpel');
+  const tanggalEl = document.getElementById('riwayatWaTanggal');
+  const catatanEl = document.getElementById('riwayatWaCatatan');
+  const msgEl = document.getElementById('riwayatWaMsg');
+  msgEl.className = 'status-msg'; msgEl.textContent = '';
+
+  const idpel = (idpelEl.value||'').trim();
+  const catatan = (catatanEl.value||'').trim();
+  // Tanggal boleh diubah ke tanggal lampau — inilah yang membuat pesan yang sudah dikirim
+  // SEBELUM pakai RADAR bisa dicatat backdate, bukan cuma yang baru dikirim hari ini.
+  const tanggal = validDateOrToday(tanggalEl.value);
+  if(!idpel){ msgEl.className='status-msg err'; msgEl.textContent='ID Pelanggan wajib diisi.'; return; }
+
+  const c = customers.find(x=>x.idpel===idpel);
+  if(!c){
+    msgEl.className = 'status-msg err';
+    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di data yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
+    return;
+  }
+
+  const entry = { IDPEL:idpel, Nama:c.name||'', Tanggal:tanggal, Catatan:catatan, Petugas:(APP_USER&&APP_USER.name)||'' };
+
+  if(DEMO_MODE){
+    riwayatWaList.push(entry);
+    renderRiwayatWaList();
+    idpelEl.value=''; catatanEl.value=''; tanggalEl.value = todayStr();
+    msgEl.className='status-msg ok'; msgEl.textContent=escapeHtml(c.name||idpel)+' dicatat (Mode Demo — tidak tersimpan ke Google Sheets sungguhan).';
+    return;
+  }
+  if(riwayatWaSheetMissing){
+    msgEl.className='status-msg err';
+    msgEl.textContent='Tab "Riwayat WhatsApp" belum ada di Spreadsheet Anda. Tambahkan dulu tab ini (lihat Panduan Setup) supaya riwayat kirim WA bisa disimpan.';
+    return;
+  }
+  try{
+    const header = SHEET_HEADERS.riwayatWa && SHEET_HEADERS.riwayatWa.length ? SHEET_HEADERS.riwayatWa : RIWAYAT_WA_HEADER_DEFAULT;
+    const rowValues = header.map(h=> entry[h]!==undefined ? entry[h] : '');
+    const res = await sheetsAppendRow(SHEET_NAMES.riwayatWa, rowValues);
+    entry.__row = parseAppendedRowNumber(res);
+    riwayatWaList.push(entry);
+    renderRiwayatWaList();
+    idpelEl.value=''; catatanEl.value=''; tanggalEl.value = todayStr();
+    msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Riwayat WhatsApp.';
+  }catch(err){
+    msgEl.className='status-msg err';
+    msgEl.textContent='Gagal menyimpan: '+(err.message||String(err));
+  }
+}
+
+// idx yang sedang dalam mode edit inline di daftar Riwayat Kirim WA (index di riwayatWaList
+// ASLI, bukan daftar terbalik/urutan tampilan) — null kalau tidak ada yang sedang diedit.
+let riwayatWaEditing = null;
+function toggleRiwayatWaEdit(idx){
+  riwayatWaEditing = (riwayatWaEditing===idx) ? null : idx;
+  renderRiwayatWaList();
+}
+function cancelRiwayatWaEdit(){
+  riwayatWaEditing = null;
+  renderRiwayatWaList();
+}
+// Menyimpan hasil edit riwayat kirim WA — terutama untuk membetulkan tanggal (mis. salah
+// ketik saat mencatat backdate) atau catatan, tanpa perlu hapus & catat ulang dari awal.
+async function saveRiwayatWaEdit(idx){
+  const r = riwayatWaList[idx];
+  if(!r) return;
+  const wrap = document.querySelector('.riwayat-wa-edit-row[data-idx="'+idx+'"]');
+  if(!wrap) return;
+  const msgEl = wrap.querySelector('.riwayat-wa-edit-msg');
+  msgEl.className = 'status-msg'; msgEl.textContent = '';
+
+  const newVals = {
+    Tanggal: validDateOrToday(wrap.querySelector('.rwe-tanggal').value),
+    Catatan: wrap.querySelector('.rwe-catatan').value.trim()
+  };
+  const updated = Object.assign({}, r, newVals);
+
+  if(DEMO_MODE || !r.__row){
+    riwayatWaList[idx] = updated;
+    riwayatWaEditing = null;
+    renderRiwayatWaList();
+    return;
+  }
+  try{
+    const header = SHEET_HEADERS.riwayatWa && SHEET_HEADERS.riwayatWa.length ? SHEET_HEADERS.riwayatWa : RIWAYAT_WA_HEADER_DEFAULT;
+    const rowValues = header.map(h=> updated[h]!==undefined ? updated[h] : '');
+    await sheetsUpdateRow(SHEET_NAMES.riwayatWa, r.__row, rowValues);
+    riwayatWaList[idx] = updated;
+    riwayatWaEditing = null;
+    renderRiwayatWaList();
+  }catch(err){
+    msgEl.className='status-msg err';
+    msgEl.textContent='Gagal menyimpan perubahan: '+(err.message||String(err));
+  }
+}
+
+function renderRiwayatWaList(){
+  const el = document.getElementById('riwayatWaList');
+  if(!el) return;
+  el.innerHTML = '';
+  if(riwayatWaSheetMissing && !DEMO_MODE){
+    el.innerHTML = '<div class="empty-note">Tab "Riwayat WhatsApp" belum ada di Spreadsheet Anda — data yang dicatat di sini belum bisa tersimpan permanen. Lihat Panduan Setup untuk menambahkan tab ini.</div>';
+  }
+  if(riwayatWaList.length===0){
+    el.innerHTML += '<div class="empty-note">Belum ada riwayat kirim WA tercatat.</div>';
+    return;
+  }
+  riwayatWaList.slice().reverse().forEach(r=>{
+    const idx = riwayatWaList.indexOf(r);
+    const isEditing = riwayatWaEditing===idx;
+    if(isEditing){
+      const div = document.createElement('div');
+      div.className = 'riwayat-wa-edit-row';
+      div.setAttribute('data-idx', idx);
+      div.innerHTML =
+        '<div class="ci-title" style="margin-bottom:8px;">'+escapeHtml(r['Nama']||r['IDPEL']||'')+' · '+escapeHtml(r['IDPEL']||'')+'</div>'+
+        '<label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tanggal kirim</label>'+
+        '<input class="mf-input rwe-tanggal" type="date" max="'+todayStr()+'" value="'+escapeAttr(validDateOrToday(r['Tanggal']))+'">'+
+        '<input class="mf-input rwe-catatan" placeholder="Catatan" value="'+escapeAttr(r['Catatan']||'')+'">'+
+        '<div class="status-msg riwayat-wa-edit-msg"></div>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button class="mf-add-btn" style="flex:1;" onclick="saveRiwayatWaEdit('+idx+')">Simpan</button>'+
+          '<button class="btn-secondary" style="flex:1;margin-top:0;" onclick="cancelRiwayatWaEdit()">Batal</button>'+
+        '</div>';
+      el.appendChild(div);
+      return;
+    }
+    const div = document.createElement('div');
+    div.className = 'content-item';
+    div.innerHTML = '<div class="ci-thumb wa">WA</div>'+
+      '<div class="ci-info" style="flex:1;"><div class="ci-title">'+escapeHtml(r['Nama']||r['IDPEL']||'')+(r['Catatan']?' — '+escapeHtml(r['Catatan']):'')+'</div>'+
+      '<div class="ci-sub">ID Pel '+escapeHtml(r['IDPEL']||'')+' · '+escapeHtml(String(r['Tanggal']||''))+(r['Petugas']?' · oleh '+escapeHtml(r['Petugas']):'')+'</div></div>'+
+      '<button class="prospek-edit-btn" aria-label="Edit riwayat" onclick="toggleRiwayatWaEdit('+idx+')"><span class="msr" aria-hidden="true">edit</span></button>';
+    el.appendChild(div);
+  });
+}
+
 // Mengambil nomor baris sheet yang baru ditambahkan dari response values:append (mis.
 // updates.updatedRange = "'Prospek Manual'!A16:H16" -> 16) — supaya prospek yang baru saja
 // dicatat langsung bisa diedit (isi ID Pel belakangan, dsb.) tanpa perlu muat ulang data dulu.
@@ -2930,6 +3205,7 @@ async function saveProspekManual(tipe){
   const idpelEl = document.getElementById(isBe?'prospekIdpelBe':'prospekIdpelSm');
   const sumberEl = document.getElementById(isBe?'prospekSumberBe':'prospekSumberSm');
   const catatanEl = document.getElementById(isBe?'prospekCatatanBe':'prospekCatatanSm');
+  const tanggalEl = document.getElementById(isBe?'prospekTanggalBe':'prospekTanggalSm');
   const msgEl = document.getElementById(isBe?'prospekMsgBe':'prospekMsgSm');
   msgEl.className = 'status-msg'; msgEl.textContent = '';
 
@@ -2938,16 +3214,19 @@ async function saveProspekManual(tipe){
   const idpel = (idpelEl?idpelEl.value:'').trim();
   const sumber = (sumberEl.value||'').trim();
   const catatan = catatanEl.value.trim();
+  // Tanggal boleh diubah ke tanggal lampau — dipakai untuk mencatat prospek yang sebenarnya
+  // sudah didapat/dihubungi SEBELUM RADAR dipakai (backdate), bukan cuma prospek hari ini.
+  // Default ke hari ini kalau dikosongkan.
+  const tanggal = validDateOrToday(tanggalEl ? tanggalEl.value : '');
   if(!nama){ msgEl.className='status-msg err'; msgEl.textContent='Nama pelanggan wajib diisi.'; return; }
 
-  const today = new Date().toISOString().slice(0,10);
-  const entry = { IDPEL:idpel, Nama:nama, Telepon:telp, Tipe: isBe?'Brosur/Event':'Media Sosial', Sumber:sumber, Catatan:catatan, Tanggal:today, Petugas:(APP_USER&&APP_USER.name)||'' };
+  const entry = { IDPEL:idpel, Nama:nama, Telepon:telp, Tipe: isBe?'Brosur/Event':'Media Sosial', Sumber:sumber, Catatan:catatan, Tanggal:tanggal, Petugas:(APP_USER&&APP_USER.name)||'' };
 
   if(DEMO_MODE){
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
-    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value='';
+    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value=''; if(tanggalEl) tanggalEl.value=todayStr();
     msgEl.className='status-msg ok'; msgEl.textContent='Ditambahkan (Mode Demo — tidak tersimpan ke Google Sheets sungguhan).';
     return;
   }
@@ -2964,7 +3243,7 @@ async function saveProspekManual(tipe){
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
-    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value='';
+    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value=''; if(tanggalEl) tanggalEl.value=todayStr();
     msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Prospek Manual.';
   }catch(err){
     msgEl.className='status-msg err';
@@ -3002,7 +3281,8 @@ async function saveProspekEdit(tipe, idx){
     Nama: wrap.querySelector('.pe-nama').value.trim(),
     Telepon: wrap.querySelector('.pe-telp').value.trim(),
     Sumber: wrap.querySelector('.pe-sumber').value.trim(),
-    Catatan: wrap.querySelector('.pe-catatan').value.trim()
+    Catatan: wrap.querySelector('.pe-catatan').value.trim(),
+    Tanggal: validDateOrToday(wrap.querySelector('.pe-tanggal').value)
   };
   if(!newVals.Nama){ msgEl.className='status-msg err'; msgEl.textContent='Nama pelanggan wajib diisi.'; return; }
 
@@ -3055,6 +3335,8 @@ function renderProspekList(tipe){
         '<input class="mf-input pe-idpel" placeholder="ID Pelanggan (isi/ubah kalau sudah diketahui)" value="'+escapeAttr(p['IDPEL']||'')+'">'+
         '<input class="mf-input pe-sumber" placeholder="Sumber" value="'+escapeAttr(p['Sumber']||'')+'">'+
         '<input class="mf-input pe-catatan" placeholder="Catatan" value="'+escapeAttr(p['Catatan']||'')+'">'+
+        '<label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tanggal prospek didapat</label>'+
+        '<input class="mf-input pe-tanggal" type="date" max="'+todayStr()+'" value="'+escapeAttr(validDateOrToday(p['Tanggal']))+'">'+
         '<div class="status-msg prospek-edit-msg"></div>'+
         '<div style="display:flex;gap:8px;">'+
           '<button class="mf-add-btn" style="flex:1;" onclick="saveProspekEdit(\''+tipe+'\', '+idx+')">Simpan</button>'+
@@ -3228,7 +3510,7 @@ function exportDashboardExcel(){
       'Petugas Pencatat Progres': c.petugasProbing || '',
       'Status Probing': c.statusKey || '',
       'Prioritas': c.priority || '',
-      'Sumber Target': [c.srcJamNyala?'Jam Nyala':'', c.srcDibatalkan?'Dibatalkan':''].filter(Boolean).join(' & '),
+      'Sumber Target': [c.srcJamNyala?'Jam Nyala':'', c.srcDibatalkan?'Dibatalkan':'', c.srcDigital?'Probing Digital':''].filter(Boolean).join(' & '),
       'Daya Saat Ini (VA)': c.daya || '',
       'Target Daya (VA)': c.targetDayaVA || '',
       'Tarif': c.tarif || '',
@@ -3324,6 +3606,13 @@ function renderDashboard(){
     .reduce((sum,c)=>{ const s = saranTargetDaya(c.daya); return s ? sum+(s-c.daya) : sum; },0);
   const potensiBiaya = pipelineAktif
     .reduce((sum,c)=>{ const s = saranTargetDaya(c.daya); const e = estimasiBiayaPenyambungan(c.daya, s); return e!=null ? sum+e : sum; },0);
+  // Pemisahan asal realisasi — supaya kelihatan mana yang berasal dari prospek Probing
+  // Digital (c.srcDigital, ditandai lewat IDPEL yang tercatat di Prospek Manual/Riwayat
+  // WhatsApp) vs yang murni dari Probing Lapangan (Jam Nyala/Dibatalkan/temuan langsung).
+  // Statusnya sendiri tetap satu-satunya sumber kebenaran (Progres Probing) — ini cuma
+  // pelabelan asal, bukan tracker status kedua.
+  const selesaiDigital = list.filter(c=>c.statusKey==='selesai' && c.srcDigital).length;
+  const selesaiLapangan = selesai - selesaiDigital;
 
   subEl.textContent = (DEMO_MODE?'Mode Demo — ':'') + total+' pelanggan target sesuai filter aktif · diperbarui otomatis dari Google Sheets';
 
@@ -3335,7 +3624,7 @@ function renderDashboard(){
   const realisasiClick = ' onclick="showRealisasiDetail()" style="cursor:pointer;"';
   tilesEl.innerHTML =
     '<div class="tile"><div class="l">Total Target</div><div class="n">'+total+'</div><div class="d">Prioritas Tinggi: '+list.filter(c=>c.priority==='tinggi').length+'</div></div>'+
-    '<div class="tile"'+realisasiClick+'><div class="l">Realisasi</div><div class="n">'+selesai+'</div><div class="d">Konversi '+konversi.toFixed(1)+'% · Lihat detail »</div></div>'+
+    '<div class="tile"'+realisasiClick+'><div class="l">Realisasi</div><div class="n">'+selesai+'</div><div class="d">Konversi '+konversi.toFixed(1)+'% · Digital: '+selesaiDigital+' · Lapangan: '+selesaiLapangan+' · Lihat detail »</div></div>'+
     '<div class="tile"><div class="l">Estimasi Potensi Tambah Daya</div><div class="n">'+(potensiDaya/1000).toFixed(1)+' kVA</div><div class="d">dari pipeline yang masih aktif</div></div>'+
     '<div class="tile"><div class="l">Estimasi Potensi Biaya Penyambungan</div><div class="n">'+formatRupiah(potensiBiaya)+'</div><div class="d">dari pipeline yang masih aktif</div></div>'+
     '<div class="tile"'+realisasiClick+'><div class="l">Realisasi Tambah Daya</div><div class="n">'+(realisasiDaya/1000).toFixed(1)+' kVA</div><div class="d">dari '+selesai+' pelanggan tersambung · Lihat detail »</div></div>'+
@@ -3378,7 +3667,8 @@ function renderDashboard(){
   const smCount = prospekList.filter(p=>p['Tipe']==='Media Sosial').length;
   const beCount = prospekList.filter(p=>p['Tipe']==='Brosur/Event').length;
   prospekEl.innerHTML =
-    '<div class="stat-mini-row"><div class="stat-mini"><div class="n">'+smCount+'</div><div class="l">Media Sosial</div></div><div class="stat-mini"><div class="n">'+beCount+'</div><div class="l">Brosur/Event</div></div><div class="stat-mini"><div class="n">'+prospekList.length+'</div><div class="l">Total Prospek</div></div></div>'+
+    '<div class="stat-mini-row"><div class="stat-mini"><div class="n">'+smCount+'</div><div class="l">Media Sosial</div></div><div class="stat-mini"><div class="n">'+beCount+'</div><div class="l">Brosur/Event</div></div><div class="stat-mini"><div class="n">'+prospekList.length+'</div><div class="l">Total Prospek</div></div><div class="stat-mini"><div class="n">'+selesaiDigital+'</div><div class="l">Realisasi dari Digital</div></div></div>'+
+    (selesai>0 ? '<div class="empty-note" style="margin:-6px 0 12px;">Dari '+selesai+' pelanggan yang sudah realisasi: <b>'+selesaiDigital+'</b> berawal dari prospek Probing Digital (WhatsApp/Media Sosial/Brosur/Event), <b>'+selesaiLapangan+'</b> berawal dari Probing Lapangan (Jam Nyala/Dibatalkan/temuan langsung). Pelanggan dari Probing Digital tetap dicatat status & realisasinya lewat "Catat Hasil Kunjungan" yang sama seperti biasa — lihat lencana "Prospek Digital" pada kartu pelanggannya untuk menelusuri asalnya.</div>' : '')+
     (prospekList.length ? prospekList.slice().reverse().slice(0,10).map(p=>
       '<div class="content-item"><div class="ci-thumb'+(p['Tipe']==='Brosur/Event'?'':'')+'">'+(p['Tipe']==='Brosur/Event'?'EV':'SM')+'</div>'+
       '<div class="ci-info"><div class="ci-title">'+escapeHtml(p['Nama']||'')+'</div><div class="ci-sub">'+escapeHtml(p['Sumber']||'')+' · '+escapeHtml(String(p['Tanggal']||''))+'</div></div></div>'
