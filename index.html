@@ -363,6 +363,10 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .prospek-edit-row .mf-input{ margin-bottom:8px; }
 .riwayat-wa-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin-bottom:8px; background:#fff; }
 .riwayat-wa-edit-row .mf-input{ margin-bottom:8px; }
+.telepon-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin:4px 0 8px; background:#fff; }
+.telepon-edit-row .mf-input{ margin-bottom:8px; }
+.kv-edit-link{ color:var(--text-secondary); text-decoration:none; vertical-align:middle; display:inline-flex; }
+.kv-edit-link .msr{ font-size:15px; }
 .ci-thumb.wa{ background:linear-gradient(135deg,#25D366,#128C7E); }
 .tip-item{ font-size:11.5px; line-height:1.5; color:var(--text-secondary); padding:8px 0; border-bottom:1px dashed var(--grid); }
 .tip-item:last-child{ border-bottom:none; }
@@ -734,6 +738,14 @@ let DEMO_MODE = false;
 let ACCESS_TOKEN = null;
 let TOKEN_EXPIRES_AT = 0;
 let tokenClient = null;
+// Klien token TERPISAH khusus untuk refresh diam-diam (lihat silentRefreshToken() di bagian
+// SHEETS API HELPERS) — sengaja tidak memakai `tokenClient` yang sama dengan tombol "Masuk
+// dengan Google", karena callback `tokenClient` sudah terikat ke afterSignIn()/startApp() yang
+// memuat ulang SELURUH data & tampilan. Refresh diam-diam harus hanya memperbarui token lalu
+// mengulangi SATU permintaan yang gagal tadi, tanpa mengganggu form/tampilan yang sedang dibuka.
+let silentTokenClient = null;
+let currentSilentResolve = null;
+let tokenRefreshPromise = null;
 let APP_USER = null; // {name, email, picture}
 
 let customers = [];           // final merged customer records (used by both real & demo mode)
@@ -751,6 +763,7 @@ let lapanganMode = 'today';
 let lapanganSearchQuery = ''; // isian kolom cari (nama/IDPEL) di tab Probing Lapangan
 let todaysPlan = [];          // idpel list, in Mapping Target order
 let activeIdpel = null;       // currently open detail record in Probing Lapangan
+let teleponEditing = null;    // idpel yang nomor teleponnya sedang diedit inline di kartu detail
 
 let prospekList = [];         // prospek manual (Media Sosial & Brosur/Event), dari sheet "Prospek Manual"
 let prospekSheetMissing = false; // true kalau spreadsheet belum punya tab "Prospek Manual"
@@ -759,6 +772,12 @@ let biayaTanggaSheetMissing = false; // true kalau spreadsheet belum punya tab "
 let riwayatWaList = [];       // log kirim pesan WhatsApp (termasuk yang dicatat backdate), dari sheet "Riwayat WhatsApp"
 let riwayatWaSheetMissing = false; // true kalau spreadsheet belum punya tab "Riwayat WhatsApp"
 let digitalSubtab = 'wa';
+// SEMUA baris "Data Identitas" (idpel -> {name, addr, lat, lng, kontak1, identitasRow, dst}),
+// TIDAK difilter jadi target seperti `customers` — dipakai supaya pelanggan yang belum pernah
+// jadi target (belum ada sinyal Jam Nyala/Dibatalkan/Probing Digital) tapi SUDAH terdaftar di
+// Data Identitas tetap bisa dicari lewat ID Pelanggan saat pertama kali dicatat sebagai prospek
+// Probing Digital (lihat findOrCreateCustomerByIdpel()). Diisi ulang tiap reloadAllData().
+let identitasByIdpel = {};
 
 // Nama tab disesuaikan persis dengan nama tab di Google Sheets master data sungguhan
 // milik PLN ULP Nabire Kota (dikonfirmasi langsung dari tab spreadsheet asli: "Paskabayar"
@@ -1186,6 +1205,14 @@ async function reloadAllData(){
   try{
     if(DEMO_MODE){
       customers = buildDemoCustomers();
+      // Mode Demo tidak punya sheet "Data Identitas" sungguhan — lookup ini disamakan dari
+      // daftar 6 pelanggan contoh itu sendiri, supaya findOrCreateCustomerByIdpel() (dipakai
+      // saat mencatat prospek/riwayat WA dengan ID Pel yang belum jadi target) tetap berlaku
+      // sama persis seperti mode sungguhan, bukan cuma jalan berbeda yang tidak pernah teruji.
+      identitasByIdpel = {};
+      customers.forEach(c=>{
+        identitasByIdpel[c.idpel] = { idpel:c.idpel, name:c.name, addr:c.addr, kecamatan:c.kecamatan, kddk:'', rbm:c.rbm, petugas:c.petugas, lat:c.lat, lng:c.lng, kontak1:c.kontak1, kontak2:'', identitasRow:null };
+      });
       prospekList = buildDemoProspek();
       prospekSheetMissing = false;
       fotoPaskaFiles = []; fotoPaskaLoaded = true; fotoPaskaLoadError = null;
@@ -1263,10 +1290,78 @@ async function reloadAllData(){
 --------------------------------------------------------------------- */
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets/';
 
+// Kalau Google Sheets API menjawab 401 (token akses kedaluwarsa — ini NORMAL kalau sesi sudah
+// terbuka lebih dari sekitar 1 jam, kasus paling umum: petugas sedang lama mengisi kunjungan di
+// lapangan tanpa memuat ulang halaman), coba dapatkan token baru SECARA DIAM-DIAM dulu lewat
+// klien token terpisah (silentTokenClient — lihat GLOBAL STATE) sebelum benar-benar menyerah.
+// Google Identity Services bisa memberi token baru tanpa popup selama sesi Google di browser
+// ini masih aktif dan izinnya sudah pernah diberikan sebelumnya (login pertama). Dedupe lewat
+// tokenRefreshPromise supaya kalau beberapa permintaan Sheets gagal 401 hampir bersamaan (mis.
+// saveVisitOutcome() menulis ke "Progres Probing" DAN "Riwayat Probing" sekaligus), cuma satu
+// proses refresh yang jalan, yang lain ikut menunggu hasil yang sama.
+function silentRefreshToken(){
+  if(tokenRefreshPromise) return tokenRefreshPromise;
+  if(!(window.google && google.accounts && google.accounts.oauth2) || !CFG.clientId){
+    return Promise.resolve(false);
+  }
+  tokenRefreshPromise = new Promise((resolve)=>{
+    let settled = false;
+    const finish = (ok)=>{ if(settled) return; settled = true; tokenRefreshPromise = null; resolve(ok); };
+    currentSilentResolve = finish;
+    try{
+      if(!silentTokenClient){
+        silentTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CFG.clientId,
+          scope: SCOPES,
+          // Callback ini TETAP untuk seumur hidup silentTokenClient (GIS tidak mengizinkan
+          // menggantinya per panggilan) — jadi selalu membaca currentSilentResolve yang PALING
+          // BARU (variabel biasa, bukan ditutup lewat closure) supaya tiap panggilan
+          // silentRefreshToken() berikutnya tetap menyelesaikan Promise miliknya sendiri, bukan
+          // cuma yang pertama kali dibuat.
+          callback: (resp)=>{
+            const ok = !!(resp && resp.access_token);
+            if(ok) persistToken(resp.access_token, resp.expires_in);
+            if(currentSilentResolve) currentSilentResolve(ok);
+          }
+        });
+      }
+      silentTokenClient.requestAccessToken({ prompt:'' });
+    }catch(e){
+      finish(false);
+    }
+    // Jaga-jaga kalau callback-nya tidak pernah terpanggil (mis. popup diblokir browser) —
+    // jangan sampai proses menyimpan menggantung selamanya menunggu refresh yang tidak datang.
+    setTimeout(()=>finish(false), 10000);
+  });
+  return tokenRefreshPromise;
+}
+// Pembungkus fetch dipakai SEMUA helper Sheets API di bawah — otomatis menyisipkan header
+// Authorization, dan kalau responsnya 401, coba sekali refresh diam-diam lalu ulangi
+// permintaannya sebelum benar-benar dianggap gagal. Ini supaya sesi yang kedaluwarsa di tengah
+// petugas mengisi form tidak langsung menggagalkan penyimpanan dan tidak menghapus isian yang
+// sudah diketik (form-nya tetap utuh di layar, cuma permintaan simpannya yang diulang di
+// belakang layar). Kalau refresh diam-diam juga gagal (mis. sesi Google di browser ini SENDIRI
+// sudah berakhir, bukan cuma token akses RADAR-nya), baru tampilkan pesan yang jelas.
+async function sheetsFetch(url, options){
+  options = options || {};
+  options.headers = Object.assign({}, options.headers, { Authorization:'Bearer '+ACCESS_TOKEN });
+  let res = await fetch(url, options);
+  if(res.status===401){
+    const refreshed = await silentRefreshToken();
+    if(refreshed){
+      options.headers = Object.assign({}, options.headers, { Authorization:'Bearer '+ACCESS_TOKEN });
+      res = await fetch(url, options);
+    }
+  }
+  if(res.status===401){
+    throw new Error('Sesi Google kedaluwarsa dan tidak bisa diperbarui otomatis. Isian yang sedang diketik TIDAK hilang — buka menu di pojok kiri atas, tekan "Keluar", masuk kembali dengan Google, lalu kembali ke sini dan tekan Simpan lagi.');
+  }
+  return res;
+}
+
 async function sheetsGet(range){
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range);
-  const res = await fetch(url, { headers:{ Authorization:'Bearer '+ACCESS_TOKEN } });
-  if(res.status===401){ throw new Error('Sesi Google kedaluwarsa. Silakan keluar lalu masuk kembali.'); }
+  const res = await sheetsFetch(url, {});
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal mengambil sheet "'+range+'" (HTTP '+res.status+'). '+t.slice(0,200)); }
   const data = await res.json();
   return data.values || [];
@@ -1274,14 +1369,14 @@ async function sheetsGet(range){
 async function sheetsUpdateRow(sheetName, rowIndex1based, rowValues){
   const range = "'"+sheetName+"'!A"+rowIndex1based;
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + '?valueInputOption=USER_ENTERED';
-  const res = await fetch(url, { method:'PUT', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values:[rowValues] }) });
+  const res = await sheetsFetch(url, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ values:[rowValues] }) });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menyimpan ke sheet (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
 async function sheetsAppendRow(sheetName, rowValues){
   const range = "'"+sheetName+"'!A1";
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
-  const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values:[rowValues] }) });
+  const res = await sheetsFetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ values:[rowValues] }) });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menambah baris (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
@@ -1290,7 +1385,7 @@ async function sheetsAppendRow(sheetName, rowValues){
 async function sheetsAppendRows(sheetName, rowsValues){
   const range = "'"+sheetName+"'!A1";
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
-  const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values: rowsValues }) });
+  const res = await sheetsFetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ values: rowsValues }) });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menambah baris (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
@@ -1299,7 +1394,7 @@ async function sheetsAppendRows(sheetName, rowsValues){
 async function sheetsClearRange(sheetName, range){
   const fullRange = "'"+sheetName+"'!"+range;
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(fullRange) + ':clear';
-  const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' } });
+  const res = await sheetsFetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' } });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal mengosongkan sheet (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
@@ -1316,7 +1411,7 @@ async function sheetsUpdateCell(sheetName, rowIndex1based, colIndex0based, value
   const colLetter = colLetterFromIndex(colIndex0based);
   const range = "'"+sheetName+"'!"+colLetter+rowIndex1based;
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + '?valueInputOption=USER_ENTERED';
-  const res = await fetch(url, { method:'PUT', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values:[[value]] }) });
+  const res = await sheetsFetch(url, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ values:[[value]] }) });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menyimpan sel (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
@@ -1631,6 +1726,9 @@ function buildCustomersFromSheets(sheets){
   });
 
   const master = {};
+  // Direset ulang di sini (bukan cuma ditambah) supaya pelanggan yang barisnya sudah dihapus
+  // dari Data Identitas ikut hilang dari lookup ini juga, bukan tersisa dari muatan sebelumnya.
+  identitasByIdpel = {};
   (sheets.identitas||[]).forEach(r=>{
     const idpel = String(r['IDPEL']||'').trim();
     if(!idpel) return;
@@ -1645,6 +1743,10 @@ function buildCustomersFromSheets(sheets){
       // menulis balik ke kolom "Kontak 1" pelanggan yang tepat.
       identitasRow: r.__row
     };
+    // Salinan lepas (bukan referensi ke master[idpel]) — supaya perubahan lanjutan pada
+    // master[idpel] di bawah (mis. diisi data Pascabayar/Prabayar/Dibatalkan) tidak ikut
+    // menimpa identitasByIdpel, yang harus tetap murni data Data Identitas apa adanya.
+    identitasByIdpel[idpel] = Object.assign({}, master[idpel]);
   });
   function ensureRecord(idpel, seed){
     if(!master[idpel]) master[idpel] = Object.assign({ idpel, name:'', addr:'', kecamatan:'', kddk:'', rbm:'', petugas:'', lat:NaN, lng:NaN, kontak1:'', kontak2:'', daya:0, tarif:'', kogol:'', jenisPelanggan:null }, seed||{});
@@ -1770,6 +1872,43 @@ function computeDigitalSourceByIdpel(prospekArr, riwayatWaArr){
     byIdpel[idpel].push({ kanal:'WhatsApp', sumber:'', tanggal: r['Tanggal']||'', catatan: r['Catatan']||'' });
   });
   return byIdpel;
+}
+
+// Dipakai saat mencatat prospek/riwayat WA baru (saveRiwayatWa(), saveProspekManual(),
+// saveProspekEdit(), addManualWaTarget()) untuk mencari pelanggannya lewat ID Pelanggan.
+// Beda dengan `customers.find(...)` biasa: kalau pelanggan itu BELUM PERNAH jadi target
+// (belum ada sinyal Jam Nyala/Dibatalkan, dan ini kali PERTAMA dia dihubungi lewat Probing
+// Digital) jadi belum ada di array `customers`, fungsi ini akan membuatkan kartu pelanggannya
+// SAAT ITU JUGA dari data "Data Identitas" (lewat identitasByIdpel — lihat GLOBAL STATE), jadi
+// petugas tidak perlu tahu dulu apakah pelanggan ini "target" atau bukan sebelum bisa mencatat
+// prospeknya — cukup ID Pelanggan-nya ada di Data Identitas. Mengembalikan null kalau ID
+// Pelanggan itu benar-benar tidak ditemukan di mana pun (baik sebagai target maupun di Data
+// Identitas) — itu baru kasus "ID Pelanggan salah ketik" yang sebenarnya.
+function findOrCreateCustomerByIdpel(idpel){
+  let c = customers.find(x=>x.idpel===idpel);
+  if(c) return c;
+  const seed = identitasByIdpel[idpel];
+  if(!seed) return null;
+  c = Object.assign({
+    daya:0, tarif:'', kogol:'', jenisPelanggan:null, permohonanDibatalkan:false,
+    statusProbing:'Belum Dikunjungi', catatanTerakhir:'', tanggalUpdateTerakhir:'',
+    targetDayaVA:'', biayaPenyambungan:'', diskon:'', promo:'', foto:'', petugasProbing:'',
+    progresRow:null, riwayatProbing:[], usageHistory:[],
+    srcJamNyala:false, srcDibatalkan:false, jamNyalaFreq:0,
+    digitalSources:[], srcDigital:false, priority:'sedang'
+  }, seed);
+  c.statusKey = statusKeyOf(c.statusProbing);
+  c.initials = initialsOf(c.name);
+  customers.push(c);
+  return c;
+}
+// Menandai sebuah kartu pelanggan sebagai berasal dari Probing Digital SAAT ITU JUGA (tanpa
+// menunggu reloadAllData()), begitu satu baris prospek/riwayat WA berhasil tersimpan — supaya
+// lencana "Prospek Digital", "Alasan Jadi Target", dan kemunculannya di Probing Lapangan
+// langsung terlihat di sesi yang sama, bukan baru muncul setelah muat ulang halaman.
+function attachDigitalSourceToCustomer(c, sourceEntry){
+  c.digitalSources = (c.digitalSources||[]).concat([sourceEntry]).sort((a,b)=> String(a.tanggal).localeCompare(String(b.tanggal)));
+  c.srcDigital = true;
 }
 
 function formatTanggal(v){
@@ -2527,7 +2666,7 @@ function openLapanganDetail(idpel){
           '<div class="photo-placeholder"><span class="msr photo-cam" aria-hidden="true">photo_camera</span><span>'+(fotoPaskaLoaded ? 'Belum ada foto rumah — buka tab Foto' : 'Memuat foto rumah…')+'</span></div>'
         )+
       '</div>'+
-      '<div class="detail-actions-row">'+
+      '<div class="detail-actions-row" id="detailActionsRow">'+
         '<a class="action-btn'+(c.kontak1?'':' disabled')+'" href="'+(c.kontak1?'tel:'+teleponHref:'#')+'"><span class="ic msr" aria-hidden="true">call</span><span>Telepon</span></a>'+
         '<a class="action-btn'+(waHref?'':' disabled')+'" href="'+(waHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">chat</span><span>WhatsApp</span></a>'+
         '<a class="action-btn'+(hasCoord?'':' disabled')+'" href="'+(mapsHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">directions</span><span>Maps</span></a>'+
@@ -2545,7 +2684,7 @@ function openLapanganDetail(idpel){
         '<div class="section-title" style="margin-top:0;">Alasan Jadi Target</div>'+
         '<div class="meta">'+reasonText+'</div>'+
         '<div class="kv-row"><span class="k">ID Pelanggan</span><span class="v">'+escapeHtml(c.idpel)+'</span></div>'+
-        '<div class="kv-row"><span class="k">Telepon</span><span class="v">'+(c.kontak1? escapeHtml(c.kontak1) : '-')+'</span></div>'+
+        '<div id="teleponRowWrap">'+renderTeleponRowHtml(c, idpel)+'</div>'+
         '<div class="kv-row"><span class="k">Daya saat ini</span><span class="v">'+c.daya+' VA'+(c.tarif?(' · '+escapeHtml(c.tarif)):'')+'</span></div>'+
         (saran? '<div class="kv-row"><span class="k">Estimasi Daya Tersambung</span><span class="v">'+saran+' VA</span></div>' : '')+
         (saran? '<div class="kv-row"><span class="k">Estimasi Biaya Penyambungan</span><span class="v">'+
@@ -2629,6 +2768,94 @@ function openLapanganDetail(idpel){
         buildRiwayatProbingTimeline(c.riwayatProbing||[])+
       '</div>'+
     '</div>';
+}
+// Edit inline nomor telepon (Kontak 1) langsung dari kartu detail Probing Lapangan — dipakai
+// untuk memperbarui nomor yang salah/berubah tanpa harus lewat tab WhatsApp di Probing Digital.
+// Sama seperti addManualWaTarget(), perubahan ditulis balik ke kolom "Kontak 1" di sheet Data
+// Identitas (lewat sheetsUpdateCell + c.identitasRow) supaya tersinkron untuk semua petugas,
+// bukan cuma tersimpan lokal di perangkat ini.
+// Cuma bagian baris Telepon-nya sendiri yang di-refresh (bukan seluruh kartu detail) supaya
+// isian form "Catat Hasil Kunjungan" di bawahnya yang sedang diketik petugas tidak ikut hilang.
+function renderTeleponRowHtml(c, idpel){
+  if(teleponEditing===idpel){
+    return '<div class="telepon-edit-row">'+
+        '<label>Nomor Telepon</label>'+
+        '<input id="teleponEditInput" class="mf-input" type="tel" inputmode="tel" placeholder="Mis. 0812xxxxxxx" value="'+escapeAttr(c.kontak1||'')+'">'+
+        '<div class="status-msg" id="teleponEditMsg"></div>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button class="mf-add-btn" style="flex:1;" onclick="saveTeleponEdit(\''+idpel+'\')">Simpan</button>'+
+          '<button class="btn-secondary" style="flex:1;margin-top:0;" onclick="cancelTeleponEdit(\''+idpel+'\')">Batal</button>'+
+        '</div>'+
+      '</div>';
+  }
+  return '<div class="kv-row"><span class="k">Telepon</span><span class="v">'+(c.kontak1? escapeHtml(c.kontak1) : '-')+' <a href="#" class="kv-edit-link" onclick="toggleTeleponEdit(\''+idpel+'\');return false;"><span class="msr" aria-hidden="true">edit</span></a></span></div>';
+}
+function refreshTeleponRow(idpel){
+  const c = customers.find(x=>x.idpel===idpel);
+  const wrap = document.getElementById('teleponRowWrap');
+  if(c && wrap) wrap.innerHTML = renderTeleponRowHtml(c, idpel);
+}
+// Tombol aksi cepat "Telepon"/"WhatsApp" di atas kartu detail dihitung dari c.kontak1 saat
+// kartu pertama dibuka — disegarkan lagi di sini setelah nomor diedit supaya langsung aktif
+// dengan nomor baru tanpa perlu menutup-buka kartu detailnya lagi. Maps/Waze ikut ditulis ulang
+// juga (walau tidak berubah) karena lebih sederhana daripada memisahkannya, dan tidak berisiko
+// menghapus input apa pun (keduanya cuma tautan, bukan field isian).
+function refreshDetailActionsRow(idpel){
+  const c = customers.find(x=>x.idpel===idpel);
+  const wrap = document.getElementById('detailActionsRow');
+  if(!c || !wrap) return;
+  const teleponHref = (c.kontak1||'').replace(/[^0-9+]/g,'');
+  const hasCoord = c.lat!=null && c.lng!=null && !isNaN(c.lat) && !isNaN(c.lng);
+  const mapsHref = hasCoord ? 'https://www.google.com/maps/dir/?api=1&destination='+c.lat+','+c.lng : '';
+  const wazeHref = hasCoord ? 'https://waze.com/ul?ll='+c.lat+','+c.lng+'&navigate=yes' : '';
+  const waHref = c.kontak1 ? 'https://wa.me/62'+teleponHref.replace(/^0/,'') : '';
+  wrap.innerHTML =
+    '<a class="action-btn'+(c.kontak1?'':' disabled')+'" href="'+(c.kontak1?'tel:'+teleponHref:'#')+'"><span class="ic msr" aria-hidden="true">call</span><span>Telepon</span></a>'+
+    '<a class="action-btn'+(waHref?'':' disabled')+'" href="'+(waHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">chat</span><span>WhatsApp</span></a>'+
+    '<a class="action-btn'+(hasCoord?'':' disabled')+'" href="'+(mapsHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">directions</span><span>Maps</span></a>'+
+    '<a class="action-btn'+(hasCoord?'':' disabled')+'" href="'+(wazeHref||'#')+'" target="_blank"><span class="ic msr" aria-hidden="true">navigation</span><span>Waze</span></a>';
+}
+function toggleTeleponEdit(idpel){
+  teleponEditing = (teleponEditing===idpel) ? null : idpel;
+  refreshTeleponRow(idpel);
+}
+function cancelTeleponEdit(idpel){
+  teleponEditing = null;
+  refreshTeleponRow(idpel);
+}
+async function saveTeleponEdit(idpel){
+  const c = customers.find(x=>x.idpel===idpel);
+  if(!c) return;
+  const input = document.getElementById('teleponEditInput');
+  const msgEl = document.getElementById('teleponEditMsg');
+  const phone = input ? input.value.trim() : '';
+  const prevKontak1 = c.kontak1;
+  c.kontak1 = phone;
+
+  if(DEMO_MODE){
+    teleponEditing = null;
+    refreshTeleponRow(idpel);
+    refreshDetailActionsRow(idpel);
+    return;
+  }
+  const kontak1Idx = (SHEET_HEADERS.identitas||[]).indexOf('Kontak 1');
+  if(kontak1Idx===-1 || !c.identitasRow){
+    // Tidak bisa menyimpan permanen (kolom "Kontak 1" atau baris identitas tidak ditemukan) —
+    // nomor tetap dipakai untuk sesi ini di kartu detail supaya petugas tidak kehilangan
+    // pengisiannya, tapi kasih tahu supaya tidak mengira sudah tersimpan ke Sheets.
+    if(msgEl){ msgEl.className='status-msg err'; msgEl.textContent='Nomor dipakai untuk sesi ini, tapi tidak bisa disimpan permanen (kolom "Kontak 1" tidak ditemukan di Data Identitas).'; }
+    return;
+  }
+  if(msgEl){ msgEl.className='status-msg'; msgEl.textContent='Menyimpan…'; }
+  try{
+    await sheetsUpdateCell(SHEET_NAMES.identitas, c.identitasRow, kontak1Idx, phone);
+    teleponEditing = null;
+    refreshTeleponRow(idpel);
+    refreshDetailActionsRow(idpel);
+  }catch(err){
+    c.kontak1 = prevKontak1; // gagal tersimpan -> kembalikan nilai lama supaya tidak menyesatkan
+    if(msgEl){ msgEl.className='status-msg err'; msgEl.textContent='Gagal menyimpan nomor: '+(err.message||String(err)); }
+  }
 }
 // Ganti tab aktif di kartu detail Probing Lapangan (Info | Foto | Pemakaian | Riwayat) —
 // murni tampilan (toggle display), semua isi tetap ada di DOM yang sama supaya form "Catat
@@ -2915,10 +3142,14 @@ async function addManualWaTarget(){
     msgEl.className = 'status-msg err'; msgEl.textContent = 'ID Pelanggan dan Nomor HP wajib diisi.';
     return;
   }
-  const c = customers.find(x=> x.idpel===idpel);
+  // findOrCreateCustomerByIdpel (bukan cuma customers.find) supaya pelanggan yang BELUM PERNAH
+  // jadi target (mis. belum ada sinyal Jam Nyala/Dibatalkan) tapi sudah terdaftar di Data
+  // Identitas tetap bisa ditambahkan ke segmen WhatsApp — kartu datanya (nama, dst.) tetap
+  // ditarik dari Data Identitas, sesuai permintaan awal fitur ini.
+  const c = findOrCreateCustomerByIdpel(idpel);
   if(!c){
     msgEl.className = 'status-msg err';
-    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di data yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
+    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di Data Identitas yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
     return;
   }
   const prevKontak1 = c.kontak1;
@@ -3063,17 +3294,26 @@ async function saveRiwayatWa(){
   const tanggal = validDateOrToday(tanggalEl.value);
   if(!idpel){ msgEl.className='status-msg err'; msgEl.textContent='ID Pelanggan wajib diisi.'; return; }
 
-  const c = customers.find(x=>x.idpel===idpel);
+  const c = findOrCreateCustomerByIdpel(idpel);
   if(!c){
     msgEl.className = 'status-msg err';
-    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di data yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
+    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di Data Identitas yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
     return;
   }
 
   const entry = { IDPEL:idpel, Nama:c.name||'', Tanggal:tanggal, Catatan:catatan, Petugas:(APP_USER&&APP_USER.name)||'' };
+  // Begitu tersimpan, kartu pelanggan ini langsung ditandai berasal dari Probing Digital di sesi
+  // ini juga (tanpa menunggu muat ulang) — supaya kalau dia belum pernah jadi target sebelumnya,
+  // kartunya langsung terlihat & bisa dibuka di Probing Lapangan untuk dicatat realisasinya.
+  const finalizeAsDigitalSource = ()=>{
+    attachDigitalSourceToCustomer(c, { kanal:'WhatsApp', sumber:'', tanggal, catatan });
+    renderMappingList();
+    renderLapanganList();
+  };
 
   if(DEMO_MODE){
     riwayatWaList.push(entry);
+    finalizeAsDigitalSource();
     renderRiwayatWaList();
     idpelEl.value=''; catatanEl.value=''; tanggalEl.value = todayStr();
     msgEl.className='status-msg ok'; msgEl.textContent=escapeHtml(c.name||idpel)+' dicatat (Mode Demo — tidak tersimpan ke Google Sheets sungguhan).';
@@ -3090,9 +3330,10 @@ async function saveRiwayatWa(){
     const res = await sheetsAppendRow(SHEET_NAMES.riwayatWa, rowValues);
     entry.__row = parseAppendedRowNumber(res);
     riwayatWaList.push(entry);
+    finalizeAsDigitalSource();
     renderRiwayatWaList();
     idpelEl.value=''; catatanEl.value=''; tanggalEl.value = todayStr();
-    msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Riwayat WhatsApp.';
+    msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Riwayat WhatsApp'+(c.srcDigital && c.digitalSources.length===1 ? ' — kartu pelanggan '+escapeHtml(c.name||idpel)+' langsung dapat dibuka di Probing Lapangan.' : '.');
   }catch(err){
     msgEl.className='status-msg err';
     msgEl.textContent='Gagal menyimpan: '+(err.message||String(err));
@@ -3221,11 +3462,22 @@ async function saveProspekManual(tipe){
   if(!nama){ msgEl.className='status-msg err'; msgEl.textContent='Nama pelanggan wajib diisi.'; return; }
 
   const entry = { IDPEL:idpel, Nama:nama, Telepon:telp, Tipe: isBe?'Brosur/Event':'Media Sosial', Sumber:sumber, Catatan:catatan, Tanggal:tanggal, Petugas:(APP_USER&&APP_USER.name)||'' };
+  // Kalau ID Pelanggan sudah diisi SEJAK AWAL (bukan menyusul lewat edit — lihat
+  // saveProspekEdit()), langsung cari/buatkan kartu pelanggannya dan tandai sumbernya di sesi
+  // ini juga, supaya tidak perlu menunggu muat ulang untuk melihatnya di Probing Lapangan.
+  // Kalau ID Pelanggannya tidak ditemukan di Data Identitas, prospeknya TETAP tersimpan seperti
+  // biasa (banyak prospek awal memang belum tahu ID Pelanggannya) — cuma belum ada kartunya.
+  let matchedCustomer = null;
+  if(idpel){
+    matchedCustomer = findOrCreateCustomerByIdpel(idpel);
+    if(matchedCustomer) attachDigitalSourceToCustomer(matchedCustomer, { kanal: entry.Tipe, sumber, tanggal, catatan });
+  }
 
   if(DEMO_MODE){
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
+    if(matchedCustomer){ renderMappingList(); renderLapanganList(); }
     namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value=''; if(tanggalEl) tanggalEl.value=todayStr();
     msgEl.className='status-msg ok'; msgEl.textContent='Ditambahkan (Mode Demo — tidak tersimpan ke Google Sheets sungguhan).';
     return;
@@ -3243,8 +3495,9 @@ async function saveProspekManual(tipe){
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
+    if(matchedCustomer){ renderMappingList(); renderLapanganList(); }
     namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value=''; if(tanggalEl) tanggalEl.value=todayStr();
-    msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Prospek Manual.';
+    msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Prospek Manual'+(matchedCustomer ? ' — kartu pelanggan '+escapeHtml(matchedCustomer.name||idpel)+' langsung dapat dibuka di Probing Lapangan.' : '.');
   }catch(err){
     msgEl.className='status-msg err';
     msgEl.textContent='Gagal menyimpan: '+(err.message||String(err));
@@ -3288,11 +3541,24 @@ async function saveProspekEdit(tipe, idx){
 
   const updated = Object.assign({}, p, newVals);
 
+  // ID Pelanggan baru diisi/diubah lewat edit ini (kasus utama: "isi ID Pel belakangan" setelah
+  // prospek di-follow-up dan ternyata cocok jadi pelanggan) — cari/buatkan kartunya & tandai
+  // sumbernya SEKARANG JUGA, sama seperti kalau ID Pel-nya sudah diisi sejak awal mencatat.
+  // Sengaja hanya dipicu kalau ID Pel-nya BERUBAH (bukan tiap kali edit disimpan), supaya
+  // mengedit Catatan/Sumber saja tanpa mengubah ID Pel tidak menambah entri sumber dobel.
+  const idpelJustAdded = newVals.IDPEL && newVals.IDPEL !== (p.IDPEL||'');
+  let matchedCustomer = null;
+  if(idpelJustAdded){
+    matchedCustomer = findOrCreateCustomerByIdpel(newVals.IDPEL);
+    if(matchedCustomer) attachDigitalSourceToCustomer(matchedCustomer, { kanal: updated.Tipe||'Probing Digital', sumber: newVals.Sumber, tanggal: newVals.Tanggal, catatan: newVals.Catatan });
+  }
+
   if(DEMO_MODE || !p.__row){
     prospekList[idx] = updated;
     prospekEditing = null;
     renderProspekList(tipe);
     renderDashboard();
+    if(matchedCustomer){ renderMappingList(); renderLapanganList(); }
     return;
   }
   try{
@@ -3303,6 +3569,7 @@ async function saveProspekEdit(tipe, idx){
     prospekEditing = null;
     renderProspekList(tipe);
     renderDashboard();
+    if(matchedCustomer){ renderMappingList(); renderLapanganList(); }
   }catch(err){
     msgEl.className='status-msg err';
     msgEl.textContent='Gagal menyimpan perubahan: '+(err.message||String(err));
