@@ -3459,6 +3459,33 @@ async function saveRiwayatWaEdit(idx){
   }
 }
 
+// Menghapus satu baris Riwayat WhatsApp — sama polanya dengan deleteProspekManual() di atas:
+// baris di sheet DIKOSONGKAN (bukan digeser naik) supaya __row entri lain yang sudah dimuat
+// tetap valid, dan baris kosong itu otomatis dilewati lagi begitu sheet dimuat ulang.
+async function deleteRiwayatWa(idx){
+  const r = riwayatWaList[idx];
+  if(!r) return;
+  const label = r['Nama'] || r['IDPEL'] || 'riwayat ini';
+  if(!window.confirm('Hapus catatan kirim WA untuk "'+label+'"? Tindakan ini tidak bisa dibatalkan.')) return;
+
+  if(DEMO_MODE || !r.__row){
+    riwayatWaList.splice(idx,1);
+    if(riwayatWaEditing===idx) riwayatWaEditing = null;
+    renderRiwayatWaList();
+    return;
+  }
+  try{
+    const header = SHEET_HEADERS.riwayatWa && SHEET_HEADERS.riwayatWa.length ? SHEET_HEADERS.riwayatWa : RIWAYAT_WA_HEADER_DEFAULT;
+    const lastCol = colLetterFromIndex(Math.max(header.length-1, 0));
+    await sheetsClearRange(SHEET_NAMES.riwayatWa, 'A'+r.__row+':'+lastCol+r.__row);
+    riwayatWaList.splice(idx,1);
+    if(riwayatWaEditing===idx) riwayatWaEditing = null;
+    renderRiwayatWaList();
+  }catch(err){
+    alert('Gagal menghapus: '+(err.message||String(err)));
+  }
+}
+
 function renderRiwayatWaList(){
   const el = document.getElementById('riwayatWaList');
   if(!el) return;
@@ -3499,7 +3526,8 @@ function renderRiwayatWaList(){
     div.innerHTML = '<div class="ci-thumb wa">WA</div>'+
       '<div class="ci-info" style="flex:1;"><div class="ci-title">'+escapeHtml(r['Nama']||r['IDPEL']||'')+(r['Catatan']?' — '+escapeHtml(r['Catatan']):'')+'</div>'+
       '<div class="ci-sub">ID Pel '+escapeHtml(r['IDPEL']||'')+' · '+escapeHtml(String(r['Tanggal']||''))+(r['Petugas']?' · oleh '+escapeHtml(r['Petugas']):'')+'</div></div>'+
-      '<button class="prospek-edit-btn" aria-label="Edit riwayat" onclick="toggleRiwayatWaEdit('+idx+')"><span class="msr" aria-hidden="true">edit</span></button>';
+      '<button class="prospek-edit-btn" aria-label="Edit riwayat" onclick="toggleRiwayatWaEdit('+idx+')"><span class="msr" aria-hidden="true">edit</span></button>'+
+      '<button class="prospek-edit-btn prospek-delete-btn" aria-label="Hapus riwayat" onclick="deleteRiwayatWa('+idx+')"><span class="msr" aria-hidden="true">delete</span></button>';
     el.appendChild(div);
   });
 }
