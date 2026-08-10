@@ -358,6 +358,7 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .mf-add-btn{ width:100%; background:var(--pln-navy); color:#fff; border:none; border-radius:10px; padding:10px; font-size:12.5px; font-weight:600; cursor:pointer; }
 .prospek-edit-btn{ border:1px solid var(--border); background:#fff; border-radius:9px; width:32px; height:32px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); cursor:pointer; }
 .prospek-edit-btn .msr{ font-size:16px; }
+.prospek-delete-btn{ color:#a3211f; }
 .prospek-idpel-missing{ color:var(--text-muted); font-style:italic; }
 .prospek-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin-bottom:8px; background:#fff; }
 .prospek-edit-row .mf-input{ margin-bottom:8px; }
@@ -500,6 +501,8 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       <div class="sidebar-footer">
         <div class="side-profile-menu" id="sideProfileMenu">
           <button class="side-menu-btn" onclick="reloadAllData(); closeSideProfileMenu();"><span class="msr" aria-hidden="true">refresh</span> <span>Muat Ulang Data</span></button>
+          <button class="side-menu-btn" id="btnBackfillRiwayat" onclick="backfillRiwayatProbing()" title="Isi riwayat tahapan probing untuk pelanggan lama yang statusnya sudah pernah diisi tapi belum punya catatan di tab &quot;Riwayat&quot;"><span class="msr" aria-hidden="true">history</span> <span>Perbaiki Riwayat Probing</span></button>
+          <div id="backfillRiwayatMsg" class="status-msg" style="display:none;padding:0 12px;"></div>
           <button class="side-menu-btn" onclick="backToSetup()"><span class="msr" aria-hidden="true">settings</span> <span>Pengaturan</span></button>
           <button class="side-menu-btn" onclick="signOutApp()"><span class="msr" aria-hidden="true">logout</span> <span>Keluar</span></button>
         </div>
@@ -3054,6 +3057,70 @@ async function saveVisitOutcome(idpel){
   }
 }
 
+// Perbaikan data lama — dipanggil manual lewat tombol "Perbaiki Riwayat Probing" di menu
+// sidebar. Kasusnya: pelanggan yang statusnya SUDAH pernah diisi di "Progres Probing" (tab
+// Info-nya terisi), tapi tab "Riwayat" di kartu detailnya menampilkan "Belum ada riwayat
+// tahapan probing tercatat." — itu terjadi kalau baris di "Progres Probing" itu dibuat SEBELUM
+// tab "Riwayat Probing" ditambahkan ke spreadsheet, atau diisi langsung di sheet oleh admin
+// (bukan lewat tombol "Simpan Hasil Kunjungan" di aplikasi ini — satu-satunya jalur yang selama
+// ini menulis ke log "Riwayat Probing"), sehingga log riwayatnya kosong meski status terkininya
+// ada. Fungsi ini membuat SATU baris riwayat retroaktif per pelanggan seperti itu, memakai
+// status/catatan/tanggal/petugas yang SUDAH tersimpan di Progres Probing saat ini — supaya tab
+// "Riwayat" tidak kosong lagi untuk data lama. Kunjungan BARU tetap otomatis tercatat seperti
+// biasa lewat saveVisitOutcome(), tidak perlu tombol ini lagi setelah dijalankan sekali.
+async function backfillRiwayatProbing(){
+  const btn = document.getElementById('btnBackfillRiwayat');
+  const msg = document.getElementById('backfillRiwayatMsg');
+  const showMsg = (cls, text)=>{ if(!msg) return; msg.style.display='block'; msg.className='status-msg '+cls; msg.textContent = text; };
+
+  if(DEMO_MODE){
+    showMsg('err', 'Mode Demo tidak menyimpan ke Google Sheets sungguhan.');
+    return;
+  }
+
+  const missing = customers.filter(c=> c.statusProbing && c.statusProbing!=='Belum Dikunjungi' && (!c.riwayatProbing || !c.riwayatProbing.length));
+  if(!missing.length){
+    showMsg('ok', 'Semua pelanggan yang sudah dikunjungi sudah punya riwayat. Tidak ada yang perlu diperbaiki.');
+    return;
+  }
+
+  if(btn) btn.disabled = true;
+  showMsg('', 'Memproses '+missing.length+' pelanggan…');
+  try{
+    const riwayatHeader = SHEET_HEADERS.riwayat && SHEET_HEADERS.riwayat.length ? SHEET_HEADERS.riwayat : RIWAYAT_HEADER_DEFAULT;
+    const rows = missing.map(c=>{
+      const valueMap = {
+        'IDPEL': c.idpel, 'Tanggal': c.tanggalUpdateTerakhir || todayStr(),
+        'Status Probing': c.statusProbing, 'Catatan': c.catatanTerakhir || '',
+        'Petugas': c.petugasProbing || ''
+      };
+      return riwayatHeader.map(h=> valueMap[h]!==undefined ? valueMap[h] : '');
+    });
+    await sheetsAppendRows(SHEET_NAMES.riwayat, rows);
+    riwayatSheetMissing = false;
+    missing.forEach(c=>{
+      c.riwayatProbing = [{ tanggal: c.tanggalUpdateTerakhir || todayStr(), status: c.statusProbing, catatan: c.catatanTerakhir||'', petugas: c.petugasProbing||'' }];
+    });
+    showMsg('ok', 'Selesai — '+missing.length+' riwayat retroaktif ditambahkan.');
+
+    // Kalau kartu detail pelanggan sedang terbuka, muat ulang tampilannya (sambil mempertahankan
+    // tab yang lagi aktif) supaya tab "Riwayat"-nya langsung menunjukkan hasilnya tanpa perlu
+    // ditutup-buka manual atau memuat ulang seluruh halaman.
+    const dv = document.getElementById('lapanganDetailView');
+    if(activeIdpel && dv && dv.style.display!=='none'){
+      const activeTabBtn = dv.querySelector('.detail-tab.active');
+      const activeTab = activeTabBtn && activeTabBtn.getAttribute('data-tab');
+      openLapanganDetail(activeIdpel);
+      if(activeTab) switchDetailTab(activeTab);
+    }
+  }catch(e){
+    console.error(e);
+    showMsg('err', 'Gagal: '+(e.message||String(e)));
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
 // Fungsi generik unggah berkas ke Google Drive — dipakai baik oleh uploadPhotoToDrive()
 // (foto kunjungan, ke CFG.driveFolder) maupun handleFotoRumahPicked() (foto rumah fallback
 // manual, ke folder "Foto Paska"), supaya logika multipart-upload + set izin publik hanya
@@ -3403,7 +3470,11 @@ function renderRiwayatWaList(){
     el.innerHTML += '<div class="empty-note">Belum ada riwayat kirim WA tercatat.</div>';
     return;
   }
-  riwayatWaList.slice().reverse().forEach(r=>{
+  // Diurutkan berdasarkan field "Tanggal" (terbaru di atas, tertua di bawah) — BUKAN cuma
+  // urutan baris di sheet (dibalik) seperti sebelumnya, supaya entri yang tanggalnya diubah ke
+  // tanggal lampau lewat form edit (backdate, lihat Panduan) tetap tampil di posisi yang benar
+  // secara kronologis, bukan tersisip di urutan penambahan baris.
+  riwayatWaList.slice().sort((a,b)=> String(b['Tanggal']||'').localeCompare(String(a['Tanggal']||''))).forEach(r=>{
     const idx = riwayatWaList.indexOf(r);
     const isEditing = riwayatWaEditing===idx;
     if(isEditing){
@@ -3582,6 +3653,39 @@ async function saveProspekEdit(tipe, idx){
   }
 }
 
+// Menghapus satu baris Prospek Manual — dipakai a.l. untuk membuang entri yang tidak sengaja
+// tercatat dobel (mis. tombol "+ Tambah Prospek" tertekan dua kali). Baris di sheet sengaja
+// DIKOSONGKAN (sheetsClearRange), BUKAN baris di bawahnya digeser naik lewat penghapusan
+// dimensi — supaya nomor baris (__row) entri Prospek Manual LAIN yang sudah dimuat di sesi
+// ini/perangkat lain tetap valid tanpa perlu dihitung ulang. Baris kosong itu otomatis
+// dilewati lagi begitu sheet dimuat ulang (rowsToObjects() melewati baris yang semua selnya
+// kosong) sehingga tetap tidak muncul lagi setelah refresh.
+async function deleteProspekManual(tipe, idx){
+  const p = prospekList[idx];
+  if(!p) return;
+  const label = p['Nama'] || 'prospek ini';
+  if(!window.confirm('Hapus "'+label+'" dari catatan Prospek Manual? Tindakan ini tidak bisa dibatalkan.')) return;
+
+  if(DEMO_MODE || !p.__row){
+    prospekList.splice(idx,1);
+    if(prospekEditing && prospekEditing.idx===idx) prospekEditing = null;
+    renderProspekList(tipe);
+    renderDashboard();
+    return;
+  }
+  try{
+    const header = SHEET_HEADERS.prospek && SHEET_HEADERS.prospek.length ? SHEET_HEADERS.prospek : PROSPEK_HEADER_DEFAULT;
+    const lastCol = colLetterFromIndex(Math.max(header.length-1, 0));
+    await sheetsClearRange(SHEET_NAMES.prospek, 'A'+p.__row+':'+lastCol+p.__row);
+    prospekList.splice(idx,1);
+    if(prospekEditing && prospekEditing.idx===idx) prospekEditing = null;
+    renderProspekList(tipe);
+    renderDashboard();
+  }catch(err){
+    alert('Gagal menghapus: '+(err.message||String(err)));
+  }
+}
+
 function renderProspekList(tipe){
   const wantTipe = tipe==='be' ? 'Brosur/Event' : 'Media Sosial';
   const el = document.getElementById(tipe==='be'?'prospekListBe':'prospekListSm');
@@ -3624,7 +3728,8 @@ function renderProspekList(tipe){
       '<div class="ci-info" style="flex:1;"><div class="ci-title">'+escapeHtml(p['Nama']||'')+(p['Telepon']?' · '+escapeHtml(p['Telepon']):'')+(p['Catatan']?' — '+escapeHtml(p['Catatan']):'')+'</div>'+
       '<div class="ci-sub">'+escapeHtml(p['Sumber']||'')+' · '+escapeHtml(String(p['Tanggal']||''))+(p['Petugas']?' · oleh '+escapeHtml(p['Petugas']):'')+
       (p['IDPEL']? ' · ID Pel '+escapeHtml(p['IDPEL']) : ' · <span class="prospek-idpel-missing">ID Pel belum diisi</span>')+'</div></div>'+
-      '<button class="prospek-edit-btn" aria-label="Edit prospek" onclick="toggleProspekEdit(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">edit</span></button>';
+      '<button class="prospek-edit-btn" aria-label="Edit prospek" onclick="toggleProspekEdit(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">edit</span></button>'+
+      '<button class="prospek-edit-btn prospek-delete-btn" aria-label="Hapus prospek" onclick="deleteProspekManual(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">delete</span></button>';
     el.appendChild(div);
   });
 }
