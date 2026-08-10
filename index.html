@@ -157,7 +157,7 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .gate-card .field label{ font-size:11.5px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px; }
 .gate-card .field input{ width:100%; border:1.5px solid var(--border); border-radius:10px; padding:10px 12px; font-size:13px; outline:none; }
 .gate-card .field input:focus{ border-color:var(--pln-blue); }
-.gate-card .hint{ font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+.hint{ font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
 .biaya-tangga-rows{ margin-top:10px; max-height:260px; overflow-y:auto; border:1.5px solid var(--border); border-radius:10px; padding:10px; }
 .biaya-tangga-row{ display:flex; align-items:center; gap:6px; margin-bottom:8px; }
 .biaya-tangga-row:last-child{ margin-bottom:0; }
@@ -202,8 +202,8 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
    selalu terlihat sementara daftar pelanggan discroll di sebelahnya. */
 .mapping-layout{ display:flex; align-items:flex-start; gap:20px; }
 .mapping-list-col{ flex:1 1 380px; min-width:300px; order:1; }
-.mapping-map-col{ flex:1 1 420px; min-width:300px; order:2; position:sticky; top:77px; }
-#leafletMap{ width:100%; height:min(620px, calc(100vh - 100px)); min-height:360px; border-radius:16px; overflow:hidden; border:1px solid var(--border); }
+.mapping-map-col{ flex:1 1 420px; min-width:300px; order:2; position:sticky; top:77px; z-index:0; }
+#leafletMap{ width:100%; height:min(620px, calc(100vh - 100px)); min-height:360px; border-radius:16px; overflow:hidden; border:1px solid var(--border); position:relative; z-index:0; isolation:isolate; }
 .map-legend{ display:flex; gap:14px; font-size:11px; color:var(--text-secondary); margin:-4px 0 12px; flex-wrap:wrap; }
 .map-legend span{ display:flex; align-items:center; gap:5px; }
 .map-legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
@@ -345,6 +345,8 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .wa-wrap{ background:#e5ddd5; border-radius:14px; padding:14px 10px; margin-bottom:14px; }
 .wa-link-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; background:#fff; font-size:12.5px; }
 .wa-link-item a{ background:#25D366; color:#fff; text-decoration:none; padding:7px 12px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+.wa-link-item a.wa-remove-link{ background:transparent; color:var(--text-muted); padding:0; font-weight:500; font-size:11px; text-decoration:underline; }
+.wa-manual-badge{ display:inline-block; background:var(--page); color:var(--text-secondary); border-radius:999px; padding:1px 7px; font-size:9.5px; font-weight:600; vertical-align:middle; }
 .info-callout{ background:#fff3cd; border:1px solid #ffe69c; color:#7a5a00; font-size:11.5px; line-height:1.5; padding:10px 12px; border-radius:12px; margin-bottom:14px; }
 .content-item{ display:flex; gap:10px; align-items:flex-start; border:1px solid var(--border); border-radius:12px; padding:10px; margin-bottom:8px; background:#fff; }
 .ci-thumb{ width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#c13584,#833ab4); color:#fff; font-size:10px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -353,6 +355,11 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .manual-form{ border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:14px; background:#fff; }
 .mf-input{ width:100%; font-family:inherit; font-size:12.5px; border:1px solid var(--border); border-radius:10px; padding:9px 10px; margin-bottom:8px; }
 .mf-add-btn{ width:100%; background:var(--pln-navy); color:#fff; border:none; border-radius:10px; padding:10px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.prospek-edit-btn{ border:1px solid var(--border); background:#fff; border-radius:9px; width:32px; height:32px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); cursor:pointer; }
+.prospek-edit-btn .msr{ font-size:16px; }
+.prospek-idpel-missing{ color:var(--text-muted); font-style:italic; }
+.prospek-edit-row{ border:1.5px solid var(--pln-blue); border-radius:12px; padding:12px; margin-bottom:8px; background:#fff; }
+.prospek-edit-row .mf-input{ margin-bottom:8px; }
 .tip-item{ font-size:11.5px; line-height:1.5; color:var(--text-secondary); padding:8px 0; border-bottom:1px dashed var(--grid); }
 .tip-item:last-child{ border-bottom:none; }
 .tip-item b{ color:var(--pln-navy); margin-right:4px; }
@@ -456,12 +463,12 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       </div>
       <div class="field">
         <label>Estimasi Biaya Penyambungan per Tangga Daya (opsional)</label>
-        <div class="hint">Isi sendiri daftar tarifnya — tambah atau hapus baris sebebasnya sesuai kebutuhan. Baris yang kosong akan dilewati.</div>
+        <div class="hint">Isi sendiri daftar tarifnya — tambah atau hapus baris sebebasnya sesuai kebutuhan. Baris yang kosong akan dilewati. Tabel ini otomatis tersinkron lewat tab "Estimasi Biaya" di Spreadsheet begitu disimpan sambil sudah Masuk dengan Google — jadi petugas lain yang login di perangkat baru langsung mendapat tabel yang sama, tidak perlu mengisi ulang.</div>
         <div id="biayaTanggaRows" class="biaya-tangga-rows"></div>
         <button type="button" class="btn-add-row" onclick="addBiayaTanggaRow('','','')"><span class="msr" aria-hidden="true">add</span> Tambah Baris</button>
       </div>
       <button class="btn-primary" onclick="saveSetupConfig()">Simpan Pengaturan</button>
-      <div class="gate-footer-link">Pengaturan ini hanya perlu diisi sekali per perangkat — tersimpan lokal di browser ini.</div>
+      <div class="gate-footer-link">Spreadsheet ID, Client ID, dan folder Drive hanya perlu diisi sekali per perangkat — tersimpan lokal di browser ini. Tabel Estimasi Biaya di atas terkecuali: ikut tersinkron lewat Spreadsheet.</div>
     </details>
   </div>
 </div>
@@ -573,6 +580,16 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       <div class="section-title" style="margin-top:0;">Pratinjau (pelanggan pertama di segmen)</div>
       <div class="wa-wrap"><div class="wa-bubble" id="waPreviewBubble">Tidak ada pelanggan di segmen ini.</div></div>
       <button class="btn-secondary" style="margin-top:0; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="copyAllPhones()"><span class="msr" aria-hidden="true">content_copy</span> Salin Semua Nomor di Segmen</button>
+
+      <div class="section-title">Tambah Nomor Manual ke Segmen</div>
+      <div class="manual-form">
+        <div class="hint" style="margin:0 0 8px;">Untuk pelanggan yang belum lolos kriteria target otomatis (jam nyala/dibatalkan) tapi memang mau dikirimi pesan, atau yang nomor HP-nya belum tercatat/salah di Data Identitas. Kartu data (nama, daya, dst.) tetap ditarik dari data pelanggan asli lewat ID Pelanggan — nomor yang diisi di sini otomatis tersimpan ke kolom "Kontak 1" pelanggan itu di Data Identitas.</div>
+        <input class="mf-input" id="waManualIdpel" placeholder="ID Pelanggan">
+        <input class="mf-input" id="waManualPhone" placeholder="Nomor HP (mis. 0812xxxxxxx)">
+        <button class="mf-add-btn" onclick="addManualWaTarget()">+ Tambah ke Segmen</button>
+      </div>
+      <div class="status-msg" id="waManualMsg"></div>
+
       <div class="section-title">Kirim Satu per Satu</div>
       <div id="waLinkList"></div>
     </div>
@@ -583,6 +600,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       <div class="manual-form">
         <input class="mf-input" id="prospekNamaSm" placeholder="Nama pelanggan">
         <input class="mf-input" id="prospekTelpSm" placeholder="No. telepon">
+        <input class="mf-input" id="prospekIdpelSm" placeholder="ID Pelanggan (isi kalau sudah tahu — kalau belum, boleh dikosongkan & diisi belakangan lewat Edit)">
         <select class="mf-input" id="prospekSumberSm">
           <option>Instagram</option><option>Status WhatsApp Karyawan</option><option>Facebook/Media Sosial Lain</option>
         </select>
@@ -600,6 +618,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       <div class="manual-form">
         <input class="mf-input" id="prospekNamaBe" placeholder="Nama pelanggan">
         <input class="mf-input" id="prospekTelpBe" placeholder="No. telepon">
+        <input class="mf-input" id="prospekIdpelBe" placeholder="ID Pelanggan (isi kalau sudah tahu — kalau belum, boleh dikosongkan & diisi belakangan lewat Edit)">
         <input class="mf-input" id="prospekSumberBe" placeholder="Nama event/kode brosur (mis. Car Free Day Agustus)">
         <input class="mf-input" id="prospekCatatanBe" placeholder="Catatan (opsional)">
         <button class="mf-add-btn" onclick="saveProspekManual('be')">+ Tambah Prospek</button>
@@ -713,6 +732,7 @@ let activeIdpel = null;       // currently open detail record in Probing Lapanga
 let prospekList = [];         // prospek manual (Media Sosial & Brosur/Event), dari sheet "Prospek Manual"
 let prospekSheetMissing = false; // true kalau spreadsheet belum punya tab "Prospek Manual"
 let riwayatSheetMissing = false; // true kalau spreadsheet belum punya tab "Riwayat Probing"
+let biayaTanggaSheetMissing = false; // true kalau spreadsheet belum punya tab "Estimasi Biaya"
 let digitalSubtab = 'wa';
 
 // Nama tab disesuaikan persis dengan nama tab di Google Sheets master data sungguhan
@@ -727,7 +747,8 @@ const SHEET_NAMES = {
   progres: 'Progres Probing',
   updateDaya: 'Update Daya',
   prospek: 'Prospek Manual',
-  riwayat: 'Riwayat Probing'
+  riwayat: 'Riwayat Probing',
+  biayaTangga: 'Estimasi Biaya'
 };
 const PROSPEK_HEADER_DEFAULT = ['IDPEL','Nama','Telepon','Tipe','Sumber','Catatan','Tanggal','Petugas'];
 // "Riwayat Probing" adalah LOG tiap kali "Simpan Hasil Kunjungan" ditekan (append-only, baris
@@ -735,6 +756,13 @@ const PROSPEK_HEADER_DEFAULT = ['IDPEL','Nama','Telepon','Tipe','Sumber','Catata
 // TERKINI (baris yang sama terus ditimpa). Log ini yang dipakai tab "Riwayat" di kartu detail
 // pelanggan untuk menampilkan riwayat tahapan probing dari waktu ke waktu.
 const RIWAYAT_HEADER_DEFAULT = ['IDPEL','Tanggal','Status Probing','Catatan','Petugas'];
+// "Estimasi Biaya" menyimpan tabel "Estimasi Biaya Penyambungan per Tangga Daya" secara
+// TERPUSAT di spreadsheet (bukan cuma di localStorage tiap perangkat) — supaya petugas baru
+// yang login di perangkat baru otomatis dapat nilai yang sudah diisi admin, tanpa perlu
+// mengisi ulang. Ditulis ulang (clear lalu append) setiap kali admin menyimpan Pengaturan
+// Lanjutan sambil sudah login; dibaca setiap reloadAllData() dan menimpa CFG.biayaNaikTingkat
+// lokal kalau tab ini punya data.
+const BIAYA_TANGGA_HEADER_DEFAULT = ['Dari (VA)','Ke (VA)','Biaya (Rp)'];
 const STATUS_OPTIONS = ['Belum Dikunjungi','Sudah Dikunjungi','Follow Up','Permohonan','Bayar','Tersambung','Ditolak','Tidak Bisa Dikunjungi'];
 // Folder Drive "Foto Paska" (foto rumah pelanggan Pascabayar, sudah ada sebelum RADAR dibuat)
 // milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
@@ -871,8 +899,46 @@ function collectBiayaTanggaFromForm(){
   });
   return out;
 }
+// Mengubah baris dari tab sheet "Estimasi Biaya" (format {'Dari (VA)':..,'Ke (VA)':..,
+// 'Biaya (Rp)':..}) jadi format {dari,ke,biaya} yang dipakai CFG.biayaNaikTingkat/
+// renderBiayaTanggaFields(). Baris yang dari/ke/biaya-nya kosong semua dilewati.
+function biayaTanggaRowsToList(items){
+  if(!items || !items.length) return [];
+  const out = [];
+  items.forEach(row=>{
+    const dariRaw = (row['Dari (VA)']!=null ? String(row['Dari (VA)']) : '').trim();
+    const keRaw = (row['Ke (VA)']!=null ? String(row['Ke (VA)']) : '').trim();
+    const biayaRaw = (row['Biaya (Rp)']!=null ? String(row['Biaya (Rp)']) : '').trim();
+    if(dariRaw==='' && keRaw==='' && biayaRaw==='') return;
+    out.push({
+      dari: dariRaw!=='' ? parseInt(dariRaw,10) : null,
+      ke: keRaw!=='' ? parseInt(keRaw,10) : null,
+      biaya: biayaRaw!=='' ? (parseInt(biayaRaw,10)||biayaRaw) : null
+    });
+  });
+  return out;
+}
+// Menulis ulang SELURUH tabel "Estimasi Biaya Penyambungan" ke tab sheet terpusat "Estimasi
+// Biaya" (clear dulu baris data lama, baru append baris yang sekarang) — dipanggil dari
+// saveSetupConfig() setelah admin menyimpan Pengaturan Lanjutan SAMBIL sudah login (ACCESS_TOKEN
+// ada), supaya nilai yang diisi admin otomatis tersedia buat petugas lain di perangkat lain.
+// Gagal (mis. tab belum dibuat di spreadsheet) TIDAK menggagalkan penyimpanan Pengaturan lokal —
+// cuma dicatat ke console & biayaTanggaSheetMissing diset true supaya bisa dikasih pengingat.
+async function syncBiayaTanggaToSheet(list){
+  if(!ACCESS_TOKEN || DEMO_MODE) return;
+  try{
+    await sheetsClearRange(SHEET_NAMES.biayaTangga, 'A2:Z100000');
+    const rows = (list||[]).filter(r=> r.dari!=null || r.ke!=null || r.biaya!=null)
+      .map(r=> [ r.dari!=null?r.dari:'', r.ke!=null?r.ke:'', r.biaya!=null?r.biaya:'' ]);
+    if(rows.length) await sheetsAppendRows(SHEET_NAMES.biayaTangga, rows);
+    biayaTanggaSheetMissing = false;
+  } catch(e){
+    console.warn('Gagal sinkron "Estimasi Biaya" ke sheet (tab mungkin belum ada):', e);
+    biayaTanggaSheetMissing = true;
+  }
+}
 
-function saveSetupConfig(){
+async function saveSetupConfig(){
   const spreadsheetId = document.getElementById('cfgSpreadsheetId').value.trim();
   const clientId = document.getElementById('cfgClientId').value.trim();
   const driveFolder = document.getElementById('cfgDriveFolder').value.trim();
@@ -891,8 +957,19 @@ function saveSetupConfig(){
     if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){ kantorLat = parts[0]; kantorLng = parts[1]; }
   }
   const biayaNaikTingkat = collectBiayaTanggaFromForm();
+  const hadTokenBeforeSave = !!ACCESS_TOKEN; // dicek SEBELUM clearToken() di bawah menghapusnya
   CFG = { spreadsheetId, clientId, driveFolder, fotoPaskaFolder, kantorLat, kantorLng, biayaNaikTingkat };
   persistConfig(CFG);
+  // Kalau sebelumnya sudah login (mis. admin membuka Pengaturan dari sidebar untuk mengubah
+  // tabel biaya, bukan pengisian pertama kali sebelum login), dorong tabel yang baru disimpan
+  // ke tab sheet "Estimasi Biaya" (di spreadsheet yang BARU disimpan di atas) supaya perangkat
+  // lain ikut sinkron. Dipanggil SEBELUM clearToken() karena token akun Google tidak terikat ke
+  // spreadsheet tertentu, jadi token yang sama masih berlaku untuk menulis ke spreadsheet baru.
+  // Kalau belum pernah login (pengisian pertama kali), tidak ada token untuk dipakai — dilewati,
+  // nanti tersinkron otomatis begitu admin login & menyimpan ulang dari Pengaturan.
+  if(hadTokenBeforeSave){
+    try{ await syncBiayaTanggaToSheet(biayaNaikTingkat); } catch(e){ console.warn(e); }
+  }
   DEMO_MODE = false;
   clearToken(); // client id may have changed -> force fresh consent
   tokenClient = null;
@@ -1071,10 +1148,39 @@ async function reloadAllData(){
       prospekList = buildDemoProspek();
       prospekSheetMissing = false;
       fotoPaskaFiles = []; fotoPaskaLoaded = true; fotoPaskaLoadError = null;
+      biayaTanggaSheetMissing = false;
     } else {
       const [sheets] = await Promise.all([ fetchAllSheets(), loadFotoPaskaIndex() ]);
       customers = buildCustomersFromSheets(sheets);
       prospekList = sheets.prospek || [];
+      // Kalau tab "Estimasi Biaya" ada & sudah diisi setidaknya 1 baris data, timpa
+      // CFG.biayaNaikTingkat lokal dengan nilai dari sheet ini — supaya petugas yang login di
+      // perangkat BARU otomatis dapat tabel yang sudah diisi admin sebelumnya, tanpa perlu
+      // mengisi ulang manual. Kalau tab belum ada / masih kosong, nilai lokal (kalau ada) dari
+      // pengisian sebelumnya di perangkat ini tetap dipakai apa adanya.
+      if(!biayaTanggaSheetMissing && sheets.biayaTangga && sheets.biayaTangga.length){
+        const sharedList = biayaTanggaRowsToList(sheets.biayaTangga);
+        if(sharedList.length){
+          CFG.biayaNaikTingkat = sharedList;
+          persistConfig(CFG);
+          renderBiayaTanggaFields();
+        }
+      } else if(!biayaTanggaSheetMissing){
+        // Tab "Estimasi Biaya" sudah ada tapi masih KOSONG (belum ada baris data) — kalau
+        // perangkat yang sedang memuat data ini kebetulan sudah punya tabel Biaya Penyambungan
+        // terisi secara LOKAL (mis. admin yang mengisinya waktu Pengaturan pertama kali, SEBELUM
+        // pernah login — jadi belum pernah tersinkron ke sheet lewat "Simpan Pengaturan", karena
+        // saat itu belum ada token untuk mendorongnya), dorong tabel lokal itu ke sheet SEKALI di
+        // sini secara otomatis — supaya tidak perlu admin membuka Pengaturan & menekan Simpan
+        // manual lagi. Begitu sheet sudah terisi, reload berikutnya (di perangkat mana pun,
+        // termasuk perangkat ini sendiri) akan mengambil DARI sheet (cabang di atas), bukan
+        // mendorong dari sini lagi — sheet jadi sumber kebenaran setelah baris pertama masuk.
+        const localList = normalizeBiayaTanggaList(CFG && CFG.biayaNaikTingkat) || [];
+        const hasRealLocalData = localList.some(r=> r.biaya!=null && r.biaya!=='' && !isNaN(r.biaya));
+        if(hasRealLocalData){
+          try{ await syncBiayaTanggaToSheet(localList); } catch(e){ console.warn('Gagal auto-seed tabel Estimasi Biaya ke sheet:', e); }
+        }
+      }
     }
     customers.forEach(c=>{
       const info = computeTargetInfo(c);
@@ -1121,6 +1227,41 @@ async function sheetsAppendRow(sheetName, rowValues){
   const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
   const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values:[rowValues] }) });
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menambah baris (HTTP '+res.status+'). '+t.slice(0,200)); }
+  return res.json();
+}
+// Menambah BANYAK baris sekaligus dalam satu panggilan API (dipakai syncBiayaTanggaToSheet(),
+// dsb.) — sama seperti sheetsAppendRow() tapi rowsValues adalah array of array.
+async function sheetsAppendRows(sheetName, rowsValues){
+  const range = "'"+sheetName+"'!A1";
+  const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
+  const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values: rowsValues }) });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menambah baris (HTTP '+res.status+'). '+t.slice(0,200)); }
+  return res.json();
+}
+// Mengosongkan sebuah range (dipakai sebelum menulis ulang seluruh tabel "Estimasi Biaya" dari
+// awal, supaya baris lama yang sudah dihapus di perangkat admin tidak tersisa di sheet).
+async function sheetsClearRange(sheetName, range){
+  const fullRange = "'"+sheetName+"'!"+range;
+  const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(fullRange) + ':clear';
+  const res = await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' } });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal mengosongkan sheet (HTTP '+res.status+'). '+t.slice(0,200)); }
+  return res.json();
+}
+// Index kolom (0-based) -> huruf kolom A1 notation (0->A, 25->Z, 26->AA, dst).
+function colLetterFromIndex(i){
+  let n = i+1, s='';
+  while(n>0){ const rem = (n-1)%26; s = String.fromCharCode(65+rem)+s; n = Math.floor((n-1)/26); }
+  return s;
+}
+// Menulis SATU sel spesifik (dipakai addManualWaTarget() untuk menyimpan nomor HP manual ke
+// kolom "Kontak 1" pelanggan yang tepat di sheet "Data Identitas", tanpa menimpa kolom lain di
+// baris yang sama seperti sheetsUpdateRow() — yang menimpa seluruh baris dari kolom A).
+async function sheetsUpdateCell(sheetName, rowIndex1based, colIndex0based, value){
+  const colLetter = colLetterFromIndex(colIndex0based);
+  const range = "'"+sheetName+"'!"+colLetter+rowIndex1based;
+  const url = SHEETS_BASE + encodeURIComponent(CFG.spreadsheetId) + '/values/' + encodeURIComponent(range) + '?valueInputOption=USER_ENTERED';
+  const res = await fetch(url, { method:'PUT', headers:{ Authorization:'Bearer '+ACCESS_TOKEN, 'Content-Type':'application/json' }, body: JSON.stringify({ values:[[value]] }) });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('Gagal menyimpan sel (HTTP '+res.status+'). '+t.slice(0,200)); }
   return res.json();
 }
 
@@ -1184,6 +1325,21 @@ async function fetchAllSheets(){
     out.riwayat = [];
     SHEET_HEADERS.riwayat = RIWAYAT_HEADER_DEFAULT;
     riwayatSheetMissing = true;
+  }
+
+  // "Estimasi Biaya" juga tab opsional (dipakai supaya tabel "Estimasi Biaya Penyambungan"
+  // tersinkron antar perangkat) — kalau spreadsheet lama belum punya tab ini, CFG.biayaNaikTingkat
+  // tetap dipakai dari localStorage lokal seperti biasa (lihat reloadAllData()).
+  try{
+    const biayaRows = await sheetsGet(SHEET_NAMES.biayaTangga+'!A1:Z10000');
+    const parsed = rowsToObjects(biayaRows);
+    out.biayaTangga = parsed.items;
+    SHEET_HEADERS.biayaTangga = parsed.header.length ? parsed.header : BIAYA_TANGGA_HEADER_DEFAULT;
+    biayaTanggaSheetMissing = false;
+  } catch(e){
+    out.biayaTangga = null;
+    SHEET_HEADERS.biayaTangga = BIAYA_TANGGA_HEADER_DEFAULT;
+    biayaTanggaSheetMissing = true;
   }
   return out;
 }
@@ -1398,7 +1554,11 @@ function buildCustomersFromSheets(sheets){
       kddk: r['KDDK']||'', rbm: r['RBM']||'', petugas: r['Petugas']||'',
       lat: parseFloat(r['Latitude']), lng: parseFloat(r['Longitude']),
       kontak1: r['Kontak 1']||'', kontak2: r['Kontak 2']||'',
-      daya:0, tarif:'', kogol:'', jenisPelanggan:null
+      daya:0, tarif:'', kogol:'', jenisPelanggan:null,
+      // Nomor baris di sheet "Data Identitas" (1-based) — dipakai kalau nanti petugas menambah
+      // nomor HP manual di tab WhatsApp Probing Digital (addManualWaTarget()), supaya bisa
+      // menulis balik ke kolom "Kontak 1" pelanggan yang tepat.
+      identitasRow: r.__row
     };
   });
   function ensureRecord(idpel, seed){
@@ -1669,9 +1829,12 @@ function buildDemoCustomers(){
 }
 function buildDemoProspek(){
   return [
-    { Nama:'Ibu Wulandari', Telepon:'0852-4471-2298', Tipe:'Media Sosial', Sumber:'Instagram', Catatan:'Menanyakan biaya tambah daya', Tanggal:'2026-07-19', Petugas:'Dewi K.' },
-    { Nama:'Bpk. Hendra', Telepon:'0878-1234-5566', Tipe:'Media Sosial', Sumber:'Status WhatsApp Karyawan', Catatan:'Lihat status, tanya info', Tanggal:'2026-07-16', Petugas:'Dewi K.' },
-    { Nama:'Bpk. Joko Santoso', Telepon:'0812-0000-1111', Tipe:'Brosur/Event', Sumber:'Car Free Day Agustus', Catatan:'', Tanggal:'2026-08-02', Petugas:'Siti' }
+    { IDPEL:'', Nama:'Ibu Wulandari', Telepon:'0852-4471-2298', Tipe:'Media Sosial', Sumber:'Instagram', Catatan:'Menanyakan biaya tambah daya', Tanggal:'2026-07-19', Petugas:'Dewi K.' },
+    // Contoh yang ID Pel-nya sudah diisi belakangan lewat Edit setelah diketahui cocok dengan
+    // pelanggan "Bpk. Hendra Wijaya" (5401355621) di data target — supaya Mode Demo menunjukkan
+    // bagaimana hasilnya kalau ID Pel sudah terisi.
+    { IDPEL:'5401355621', Nama:'Bpk. Hendra', Telepon:'0878-1234-5566', Tipe:'Media Sosial', Sumber:'Status WhatsApp Karyawan', Catatan:'Lihat status, tanya info', Tanggal:'2026-07-16', Petugas:'Dewi K.' },
+    { IDPEL:'', Nama:'Bpk. Joko Santoso', Telepon:'0812-0000-1111', Tipe:'Brosur/Event', Sumber:'Car Free Day Agustus', Catatan:'', Tanggal:'2026-08-02', Petugas:'Siti' }
   ];
 }
 
@@ -2596,8 +2759,89 @@ function showDigitalSubtab(name, el){
 }
 
 function waSegmentList(){
-  // Segmen WhatsApp memakai daftar target yang sama persis dengan Mapping Target (Filter Lanjutan yang aktif).
-  return getTargetList().filter(c=> (c.kontak1||'').replace(/[^0-9]/g,'').length>=8);
+  // Segmen WhatsApp memakai daftar target yang sama persis dengan Mapping Target (Filter Lanjutan
+  // yang aktif), DITAMBAH pelanggan yang sengaja ditambahkan manual lewat ID Pelanggan di tab ini
+  // (addManualWaTarget()) — supaya bisa kirim ke pelanggan yang belum lolos kriteria target
+  // otomatis (jam nyala/dibatalkan) tapi memang mau dikirimi pesan marketing tambah daya.
+  const base = getTargetList();
+  const baseIds = new Set(base.map(c=>c.idpel));
+  const manualExtra = customers.filter(c=> c.manualWaAdd && !baseIds.has(c.idpel));
+  return base.concat(manualExtra).filter(c=> (c.kontak1||'').replace(/[^0-9]/g,'').length>=8);
+}
+// Mencari pelanggan lewat ID Pelanggan (dari data yang sudah dimuat — Data Identitas/Paskabayar/
+// Prabayar, tidak perlu panggilan API baru) lalu menambahkannya ke segmen WhatsApp dengan nomor
+// HP yang diisi manual di sini. Kartu datanya (nama, daya, saran target daya, dst.) TETAP ditarik
+// dari data pelanggan asli yang sudah ada — bukan bikin data baru — cuma nomor HP-nya yang dipakai
+// dari input manual ini kalau di sheet belum ada / berbeda.
+async function addManualWaTarget(){
+  const idpelEl = document.getElementById('waManualIdpel');
+  const phoneEl = document.getElementById('waManualPhone');
+  const msgEl = document.getElementById('waManualMsg');
+  const idpel = (idpelEl.value||'').trim();
+  const phone = (phoneEl.value||'').trim();
+  msgEl.className = 'status-msg'; msgEl.textContent = '';
+
+  if(!idpel || !phone){
+    msgEl.className = 'status-msg err'; msgEl.textContent = 'ID Pelanggan dan Nomor HP wajib diisi.';
+    return;
+  }
+  const c = customers.find(x=> x.idpel===idpel);
+  if(!c){
+    msgEl.className = 'status-msg err';
+    msgEl.textContent = 'ID Pelanggan "'+escapeHtml(idpel)+'" tidak ditemukan di data yang sudah dimuat. Periksa lagi ID Pelanggannya, atau tekan tombol muat ulang (↻) di atas dulu kalau baru saja ditambahkan di Sheets.';
+    return;
+  }
+  const prevKontak1 = c.kontak1;
+  c.kontak1 = phone;
+  c.manualWaAdd = true;
+
+  if(DEMO_MODE){
+    renderWaSegment();
+    idpelEl.value=''; phoneEl.value='';
+    msgEl.className = 'status-msg ok';
+    msgEl.textContent = escapeHtml(c.name||idpel)+' ditambahkan ke segmen WhatsApp (Mode Demo — nomor tidak tersimpan ke Google Sheets sungguhan).';
+    return;
+  }
+
+  if(!c.identitasRow){
+    // Pelanggan ini tidak punya baris tersendiri di "Data Identitas" (kemungkinan datanya
+    // cuma berasal dari sheet lain seperti Paskabayar/Batal Permohonan) — nomornya tetap
+    // dipakai untuk kirim WA sesi ini, tapi tidak bisa disimpan permanen secara otomatis.
+    renderWaSegment();
+    idpelEl.value=''; phoneEl.value='';
+    msgEl.className = 'status-msg ok';
+    msgEl.textContent = escapeHtml(c.name||idpel)+' ditambahkan ke segmen WhatsApp. Nomor belum bisa disimpan otomatis ke Data Identitas (pelanggan ini tidak punya baris tersendiri di tab itu) — tambahkan manual di Sheets kalau perlu permanen.';
+    return;
+  }
+
+  const kontak1Idx = (SHEET_HEADERS.identitas||[]).indexOf('Kontak 1');
+  if(kontak1Idx===-1){
+    renderWaSegment();
+    idpelEl.value=''; phoneEl.value='';
+    msgEl.className = 'status-msg ok';
+    msgEl.textContent = escapeHtml(c.name||idpel)+' ditambahkan ke segmen WhatsApp. Nomor belum bisa disimpan permanen (kolom "Kontak 1" tidak ditemukan di tab Data Identitas).';
+    return;
+  }
+  try{
+    await sheetsUpdateCell(SHEET_NAMES.identitas, c.identitasRow, kontak1Idx, phone);
+    renderWaSegment();
+    idpelEl.value=''; phoneEl.value='';
+    msgEl.className = 'status-msg ok';
+    msgEl.textContent = escapeHtml(c.name||idpel)+' ditambahkan ke segmen WhatsApp & nomor tersimpan ke Data Identitas.';
+  }catch(err){
+    c.kontak1 = prevKontak1 || phone; // nomor tetap dipakai untuk sesi ini walau gagal tersimpan
+    renderWaSegment();
+    idpelEl.value=''; phoneEl.value='';
+    msgEl.className = 'status-msg err';
+    msgEl.textContent = escapeHtml(c.name||idpel)+' ditambahkan ke segmen WhatsApp sesi ini, tapi gagal menyimpan nomor ke Data Identitas: '+(err.message||String(err));
+  }
+}
+// Melepas pelanggan yang ditambahkan manual dari segmen WhatsApp (nomor HP yang sudah tersimpan
+// ke Data Identitas TIDAK dihapus — cuma dilepas dari daftar kirim WA sesi ini).
+function removeManualWaTarget(idpel){
+  const c = customers.find(x=>x.idpel===idpel);
+  if(c) c.manualWaAdd = false;
+  renderWaSegment();
 }
 function fillTemplate(tpl, c){
   const targetDaya = c.targetDayaVA || saranTargetDaya(c.daya) || '-';
@@ -2619,7 +2863,8 @@ function renderWaSegment(){
   if(!summaryEl || !listEl || !previewEl) return;
   const list = waSegmentList();
   const total = getTargetList().length;
-  summaryEl.textContent = list.length+' dari '+total+' pelanggan target (sesuai Filter Lanjutan aktif di Mapping Target) memiliki nomor telepon tercatat.';
+  const manualCount = list.filter(c=>c.manualWaAdd).length;
+  summaryEl.textContent = list.length+' dari '+total+' pelanggan target (sesuai Filter Lanjutan aktif di Mapping Target) memiliki nomor telepon tercatat'+(manualCount? ', ditambah '+manualCount+' pelanggan yang ditambahkan manual lewat ID Pelanggan di bawah' : '')+'.';
 
   const tpl = (document.getElementById('waTemplate')||{}).value || '';
   if(list.length===0){
@@ -2639,7 +2884,11 @@ function renderWaSegment(){
     const href = 'https://wa.me/'+waPhoneHref(c.kontak1)+'?text='+msg;
     const div = document.createElement('div');
     div.className = 'wa-link-item';
-    div.innerHTML = '<span>'+escapeHtml(c.name)+' · '+escapeHtml(c.kontak1||'')+'</span><a href="'+href+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;"><span class="msr" aria-hidden="true" style="font-size:15px;">chat</span> Kirim</a>';
+    div.innerHTML = '<span>'+escapeHtml(c.name)+' · '+escapeHtml(c.kontak1||'')+(c.manualWaAdd?' <span class="wa-manual-badge">manual</span>':'')+'</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:10px;">'+
+      (c.manualWaAdd?'<a href="#" class="wa-remove-link" onclick="removeManualWaTarget(\''+escapeAttr(c.idpel)+'\');return false;">Hapus</a>':'')+
+      '<a href="'+href+'" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;"><span class="msr" aria-hidden="true" style="font-size:15px;">chat</span> Kirim</a>'+
+      '</span>';
     listEl.appendChild(div);
   });
   if(list.length>CAP){
@@ -2662,10 +2911,23 @@ async function copyAllPhones(){
   }
 }
 
+// Mengambil nomor baris sheet yang baru ditambahkan dari response values:append (mis.
+// updates.updatedRange = "'Prospek Manual'!A16:H16" -> 16) — supaya prospek yang baru saja
+// dicatat langsung bisa diedit (isi ID Pel belakangan, dsb.) tanpa perlu muat ulang data dulu.
+function parseAppendedRowNumber(res){
+  try{
+    const range = res && res.updates && res.updates.updatedRange;
+    if(!range) return null;
+    const m = range.match(/(\d+)$/);
+    return m ? parseInt(m[1],10) : null;
+  }catch(e){ return null; }
+}
+
 async function saveProspekManual(tipe){
   const isBe = tipe==='be';
   const namaEl = document.getElementById(isBe?'prospekNamaBe':'prospekNamaSm');
   const telpEl = document.getElementById(isBe?'prospekTelpBe':'prospekTelpSm');
+  const idpelEl = document.getElementById(isBe?'prospekIdpelBe':'prospekIdpelSm');
   const sumberEl = document.getElementById(isBe?'prospekSumberBe':'prospekSumberSm');
   const catatanEl = document.getElementById(isBe?'prospekCatatanBe':'prospekCatatanSm');
   const msgEl = document.getElementById(isBe?'prospekMsgBe':'prospekMsgSm');
@@ -2673,18 +2935,19 @@ async function saveProspekManual(tipe){
 
   const nama = namaEl.value.trim();
   const telp = telpEl.value.trim();
+  const idpel = (idpelEl?idpelEl.value:'').trim();
   const sumber = (sumberEl.value||'').trim();
   const catatan = catatanEl.value.trim();
   if(!nama){ msgEl.className='status-msg err'; msgEl.textContent='Nama pelanggan wajib diisi.'; return; }
 
   const today = new Date().toISOString().slice(0,10);
-  const entry = { IDPEL:'', Nama:nama, Telepon:telp, Tipe: isBe?'Brosur/Event':'Media Sosial', Sumber:sumber, Catatan:catatan, Tanggal:today, Petugas:(APP_USER&&APP_USER.name)||'' };
+  const entry = { IDPEL:idpel, Nama:nama, Telepon:telp, Tipe: isBe?'Brosur/Event':'Media Sosial', Sumber:sumber, Catatan:catatan, Tanggal:today, Petugas:(APP_USER&&APP_USER.name)||'' };
 
   if(DEMO_MODE){
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
-    namaEl.value=''; telpEl.value=''; catatanEl.value='';
+    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value='';
     msgEl.className='status-msg ok'; msgEl.textContent='Ditambahkan (Mode Demo — tidak tersimpan ke Google Sheets sungguhan).';
     return;
   }
@@ -2696,15 +2959,73 @@ async function saveProspekManual(tipe){
   try{
     const header = SHEET_HEADERS.prospek && SHEET_HEADERS.prospek.length ? SHEET_HEADERS.prospek : PROSPEK_HEADER_DEFAULT;
     const rowValues = header.map(h=> entry[h]!==undefined ? entry[h] : '');
-    await sheetsAppendRow(SHEET_NAMES.prospek, rowValues);
+    const res = await sheetsAppendRow(SHEET_NAMES.prospek, rowValues);
+    entry.__row = parseAppendedRowNumber(res);
     prospekList.push(entry);
     renderProspekList(tipe);
     renderDashboard();
-    namaEl.value=''; telpEl.value=''; catatanEl.value='';
+    namaEl.value=''; telpEl.value=''; if(idpelEl) idpelEl.value=''; catatanEl.value='';
     msgEl.className='status-msg ok'; msgEl.textContent='Tersimpan ke Prospek Manual.';
   }catch(err){
     msgEl.className='status-msg err';
     msgEl.textContent='Gagal menyimpan: '+(err.message||String(err));
+  }
+}
+
+// idx yang sedang dalam mode edit inline di daftar Prospek Tercatat — {tipe, idx} (idx = index
+// item tersebut di array prospekList ASLI, bukan di daftar terfilter/reversed, supaya lookup-nya
+// tidak ambigu). null kalau tidak ada yang sedang diedit.
+let prospekEditing = null;
+
+function toggleProspekEdit(tipe, idx){
+  prospekEditing = (prospekEditing && prospekEditing.idx===idx) ? null : { tipe, idx };
+  renderProspekList(tipe);
+}
+function cancelProspekEdit(tipe){
+  prospekEditing = null;
+  renderProspekList(tipe);
+}
+// Menyimpan hasil edit prospek — termasuk kasus utama yang diminta: ID Pel baru diketahui
+// belakangan (setelah prospek di-follow-up), jadi baris yang sudah tercatat perlu bisa diedit
+// untuk mengisi/mengubah ID Pel-nya (dan field lain kalau perlu), bukan cuma bisa diisi saat
+// pertama kali mencatat lewat form.
+async function saveProspekEdit(tipe, idx){
+  const p = prospekList[idx];
+  if(!p) return;
+  const wrap = document.querySelector('.prospek-edit-row[data-idx="'+idx+'"]');
+  if(!wrap) return;
+  const msgEl = wrap.querySelector('.prospek-edit-msg');
+  msgEl.className = 'status-msg'; msgEl.textContent = '';
+
+  const newVals = {
+    IDPEL: wrap.querySelector('.pe-idpel').value.trim(),
+    Nama: wrap.querySelector('.pe-nama').value.trim(),
+    Telepon: wrap.querySelector('.pe-telp').value.trim(),
+    Sumber: wrap.querySelector('.pe-sumber').value.trim(),
+    Catatan: wrap.querySelector('.pe-catatan').value.trim()
+  };
+  if(!newVals.Nama){ msgEl.className='status-msg err'; msgEl.textContent='Nama pelanggan wajib diisi.'; return; }
+
+  const updated = Object.assign({}, p, newVals);
+
+  if(DEMO_MODE || !p.__row){
+    prospekList[idx] = updated;
+    prospekEditing = null;
+    renderProspekList(tipe);
+    renderDashboard();
+    return;
+  }
+  try{
+    const header = SHEET_HEADERS.prospek && SHEET_HEADERS.prospek.length ? SHEET_HEADERS.prospek : PROSPEK_HEADER_DEFAULT;
+    const rowValues = header.map(h=> updated[h]!==undefined ? updated[h] : '');
+    await sheetsUpdateRow(SHEET_NAMES.prospek, p.__row, rowValues);
+    prospekList[idx] = updated;
+    prospekEditing = null;
+    renderProspekList(tipe);
+    renderDashboard();
+  }catch(err){
+    msgEl.className='status-msg err';
+    msgEl.textContent='Gagal menyimpan perubahan: '+(err.message||String(err));
   }
 }
 
@@ -2722,11 +3043,33 @@ function renderProspekList(tipe){
     return;
   }
   items.slice().reverse().forEach(p=>{
+    const idx = prospekList.indexOf(p);
+    const isEditing = prospekEditing && prospekEditing.idx===idx;
+    if(isEditing){
+      const div = document.createElement('div');
+      div.className = 'prospek-edit-row';
+      div.setAttribute('data-idx', idx);
+      div.innerHTML =
+        '<input class="mf-input pe-nama" placeholder="Nama pelanggan" value="'+escapeAttr(p['Nama']||'')+'">'+
+        '<input class="mf-input pe-telp" placeholder="No. telepon" value="'+escapeAttr(p['Telepon']||'')+'">'+
+        '<input class="mf-input pe-idpel" placeholder="ID Pelanggan (isi/ubah kalau sudah diketahui)" value="'+escapeAttr(p['IDPEL']||'')+'">'+
+        '<input class="mf-input pe-sumber" placeholder="Sumber" value="'+escapeAttr(p['Sumber']||'')+'">'+
+        '<input class="mf-input pe-catatan" placeholder="Catatan" value="'+escapeAttr(p['Catatan']||'')+'">'+
+        '<div class="status-msg prospek-edit-msg"></div>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button class="mf-add-btn" style="flex:1;" onclick="saveProspekEdit(\''+tipe+'\', '+idx+')">Simpan</button>'+
+          '<button class="btn-secondary" style="flex:1;margin-top:0;" onclick="cancelProspekEdit(\''+tipe+'\')">Batal</button>'+
+        '</div>';
+      el.appendChild(div);
+      return;
+    }
     const div = document.createElement('div');
     div.className = 'content-item';
     div.innerHTML = '<div class="ci-thumb'+(tipe==='sm'&&/whatsapp/i.test(p['Sumber']||'')?' wa':'')+'">'+(tipe==='be'?'EV':(/whatsapp/i.test(p['Sumber']||'')?'WA':'IG'))+'</div>'+
-      '<div class="ci-info"><div class="ci-title">'+escapeHtml(p['Nama']||'')+(p['Telepon']?' · '+escapeHtml(p['Telepon']):'')+(p['Catatan']?' — '+escapeHtml(p['Catatan']):'')+'</div>'+
-      '<div class="ci-sub">'+escapeHtml(p['Sumber']||'')+' · '+escapeHtml(String(p['Tanggal']||''))+(p['Petugas']?' · oleh '+escapeHtml(p['Petugas']):'')+'</div></div>';
+      '<div class="ci-info" style="flex:1;"><div class="ci-title">'+escapeHtml(p['Nama']||'')+(p['Telepon']?' · '+escapeHtml(p['Telepon']):'')+(p['Catatan']?' — '+escapeHtml(p['Catatan']):'')+'</div>'+
+      '<div class="ci-sub">'+escapeHtml(p['Sumber']||'')+' · '+escapeHtml(String(p['Tanggal']||''))+(p['Petugas']?' · oleh '+escapeHtml(p['Petugas']):'')+
+      (p['IDPEL']? ' · ID Pel '+escapeHtml(p['IDPEL']) : ' · <span class="prospek-idpel-missing">ID Pel belum diisi</span>')+'</div></div>'+
+      '<button class="prospek-edit-btn" aria-label="Edit prospek" onclick="toggleProspekEdit(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">edit</span></button>';
     el.appendChild(div);
   });
 }
