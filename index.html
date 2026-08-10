@@ -1732,12 +1732,18 @@ function buildCustomersFromSheets(sheets){
   (sheets.identitas||[]).forEach(r=>{
     const idpel = String(r['IDPEL']||'').trim();
     if(!idpel) return;
+    // "DAYA"/"TARIF"/"KOGOL" di Data Identitas SIFATNYA OPSIONAL — kalau kolom itu ada, dipakai
+    // sebagai nilai dasar (terutama supaya pelanggan yang cuma ketemu lewat Probing Digital, TANPA
+    // riwayat di Pascabayar/Prabayar/Batal Permohonan, tetap punya info daya alih-alih "0 VA" yang
+    // salah). Kalau pelanggan itu JUGA punya riwayat di salah satu sheet tersebut, nilainya tetap
+    // ditimpa oleh langkah 1/2/3 di bawah — data billing yang lebih baru/otoritatif selalu menang.
+    const identitasDaya = parseInt(r['DAYA'],10);
     master[idpel] = {
       idpel, name: r['NAMA']||'', addr: r['ALAMAT']||'', kecamatan: r['KECAMATAN']||'',
       kddk: r['KDDK']||'', rbm: r['RBM']||'', petugas: r['Petugas']||'',
       lat: parseFloat(r['Latitude']), lng: parseFloat(r['Longitude']),
       kontak1: r['Kontak 1']||'', kontak2: r['Kontak 2']||'',
-      daya:0, tarif:'', kogol:'', jenisPelanggan:null,
+      daya: isNaN(identitasDaya) ? 0 : identitasDaya, tarif: r['TARIF']||'', kogol: r['KOGOL']!==undefined?String(r['KOGOL']):'', jenisPelanggan:null,
       // Nomor baris di sheet "Data Identitas" (1-based) — dipakai kalau nanti petugas menambah
       // nomor HP manual di tab WhatsApp Probing Digital (addManualWaTarget()), supaya bisa
       // menulis balik ke kolom "Kontak 1" pelanggan yang tepat.
