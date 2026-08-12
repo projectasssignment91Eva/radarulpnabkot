@@ -825,6 +825,15 @@ const BIAYA_TANGGA_HEADER_DEFAULT = ['Dari (VA)','Ke (VA)','Biaya (Rp)'];
 // manual petugas.
 const RIWAYAT_WA_HEADER_DEFAULT = ['IDPEL','Nama','Tanggal','Catatan','Petugas'];
 const STATUS_OPTIONS = ['Belum Dikunjungi','Sudah Dikunjungi','Follow Up','Permohonan','Bayar','Tersambung','Ditolak','Tidak Bisa Dikunjungi'];
+// Spreadsheet ID + OAuth Client ID punya ULP Nabire Kota — dipakai sebagai default kalau
+// perangkat ini belum pernah mengisi "Pengaturan Lanjutan" (localStorage-nya kosong, mis. baru
+// pertama kali buka RADAR di alamat/browser ini), supaya cukup klik "Masuk dengan Google" tanpa
+// perlu isi field itu dulu. Client ID aman ditaruh di kode sisi klien (bukan rahasia — dibatasi
+// lewat "Authorized JavaScript origins" di Google Cloud Console, bukan lewat kerahasiaan
+// nilainya). Kalau suatu saat ganti spreadsheet/Client ID, field di Pengaturan Lanjutan tetap
+// bisa diisi manual dan nilai itu yang dipakai (defaultnya cuma dipakai kalau field-nya kosong).
+const SPREADSHEET_ID_DEFAULT = '1ToRgC4AMAGuINCt-fJJnLARe819wlKvWQxQPkSTNqEc';
+const CLIENT_ID_DEFAULT = '300180104568-hnag8lrcca18b2itflivjb58fr0fmpej.apps.googleusercontent.com';
 // Folder Drive "Foto Paska" (foto rumah pelanggan Pascabayar, sudah ada sebelum RADAR dibuat)
 // milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
 // Lanjutan dikosongkan, supaya fitur sinkron foto rumah langsung jalan tanpa perlu diisi manual.
@@ -871,6 +880,13 @@ function clearToken(){
 --------------------------------------------------------------------- */
 function initApp(){
   CFG = loadConfig();
+  // Perangkat yang belum pernah mengisi Pengaturan Lanjutan (localStorage kosong) langsung
+  // dipakaikan Spreadsheet ID/Client ID default milik ULP Nabire Kota, supaya "Masuk dengan
+  // Google" bisa langsung dipencet tanpa mampir ke panel itu dulu. Kalau perangkat ini SUDAH
+  // pernah diisi (mis. sengaja diarahkan ke spreadsheet lain), nilai yang tersimpan itu tetap
+  // dipakai — default di sini cuma pengisi kekosongan, bukan menimpa.
+  if(!CFG.spreadsheetId) CFG.spreadsheetId = SPREADSHEET_ID_DEFAULT;
+  if(!CFG.clientId) CFG.clientId = CLIENT_ID_DEFAULT;
   loadCachedToken();
 
   renderBiayaTanggaFields();
