@@ -833,7 +833,7 @@ const STATUS_OPTIONS = ['Belum Dikunjungi','Sudah Dikunjungi','Follow Up','Permo
 // nilainya). Kalau suatu saat ganti spreadsheet/Client ID, field di Pengaturan Lanjutan tetap
 // bisa diisi manual dan nilai itu yang dipakai (defaultnya cuma dipakai kalau field-nya kosong).
 const SPREADSHEET_ID_DEFAULT = '1ToRgC4AMAGuINCt-fJJnLARe819wlKvWQxQPkSTNqEc';
-const CLIENT_ID_DEFAULT = '300180104568-hnag8lrcca18b2itflivjb58fr0fmpej.apps.googleusercontent.com';
+const CLIENT_ID_DEFAULT = '839176995145-k0kgmlu2hcpoj7b9k6dkbq37lbb2246r.apps.googleusercontent.com';
 // Folder Drive "Foto Paska" (foto rumah pelanggan Pascabayar, sudah ada sebelum RADAR dibuat)
 // milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
 // Lanjutan dikosongkan, supaya fitur sinkron foto rumah langsung jalan tanpa perlu diisi manual.
@@ -1809,7 +1809,7 @@ function buildCustomersFromSheets(sheets){
       // "NOMOR METER" — kolom opsional di Data Identitas (belum tentu ada di semua spreadsheet
       // yang sudah dipakai sebelum fitur ini ditambahkan). Kosong = kolomnya belum ada/belum
       // diisi, ditampilkan apa adanya di kartu detail, tidak error kalau tidak ada.
-      nomorMeter: r['NOMOR METER']||r['Nomor Meter']||'',
+      nomorMeter: r['METER']||r['NOMOR METER']||r['Nomor Meter']||'',
       daya: isNaN(identitasDaya) ? 0 : identitasDaya, tarif: r['TARIF']||'', kogol: r['KOGOL']!==undefined?String(r['KOGOL']):'', jenisPelanggan:null,
       // Nomor baris di sheet "Data Identitas" (1-based) — dipakai kalau nanti petugas menambah
       // nomor HP manual di tab WhatsApp Probing Digital (addManualWaTarget()), supaya bisa
