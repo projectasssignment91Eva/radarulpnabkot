@@ -505,6 +505,8 @@ table.trend-table tr:last-child td{ border-bottom:none; }
           <button class="side-menu-btn" onclick="reloadAllData(); closeSideProfileMenu();"><span class="msr" aria-hidden="true">refresh</span> <span>Muat Ulang Data</span></button>
           <button class="side-menu-btn" id="btnBackfillRiwayat" onclick="backfillRiwayatProbing()" title="Isi riwayat tahapan probing untuk pelanggan lama yang statusnya sudah pernah diisi tapi belum punya catatan di tab &quot;Riwayat&quot;"><span class="msr" aria-hidden="true">history</span> <span>Perbaiki Riwayat Probing</span></button>
           <div id="backfillRiwayatMsg" class="status-msg" style="display:none;padding:0 12px;"></div>
+          <button class="side-menu-btn" id="btnBackfillDayaAwal" onclick="backfillDayaAwal()" title="Isi Daya Awal untuk pelanggan yang sudah pernah diprobing (belum berstatus Selesai) tapi belum punya catatan Daya Awal — supaya realisasi tambah dayanya terhitung benar nanti"><span class="msr" aria-hidden="true">bolt</span> <span>Perbaiki Daya Awal</span></button>
+          <div id="backfillDayaAwalMsg" class="status-msg" style="display:none;padding:0 12px;"></div>
           <button class="side-menu-btn" onclick="backToSetup()"><span class="msr" aria-hidden="true">settings</span> <span>Pengaturan</span></button>
           <button class="side-menu-btn" onclick="signOutApp()"><span class="msr" aria-hidden="true">logout</span> <span>Keluar</span></button>
         </div>
@@ -1901,6 +1903,11 @@ function buildCustomersFromSheets(sheets){
       c.tanggalUpdateTerakhir = p['Tanggal Update Terakhir'] || '';
       c.targetDayaVA = p['Target Daya (VA)'] || '';
       c.biayaPenyambungan = p['Biaya Penyambungan (Rp)'] || '';
+      // "Daya Awal (VA)" — dibekukan sekali saat kunjungan PERTAMA dicatat (lihat
+      // saveVisitOutcome()), supaya tidak ikut bergeser kalau c.daya belakangan berubah
+      // begitu billing Paskabayar bulan berikutnya sudah mencatat daya yang baru terpasang.
+      // Kolom opsional — kosong untuk baris lama yang dicatat sebelum kolom ini ada.
+      c.dayaAwal = p['Daya Awal (VA)'] || '';
       // "Diskon (Rp)" & "Promo" — kolom opsional, baru berfungsi kalau nama kolom itu
       // sudah ditambahkan persis di sheet "Progres Probing" (kalau belum ada, nilainya
       // otomatis kosong di sini dan aman-aman saja, tidak akan error).
@@ -1913,7 +1920,7 @@ function buildCustomersFromSheets(sheets){
     } else {
       c.statusProbing = 'Belum Dikunjungi';
       c.catatanTerakhir = ''; c.tanggalUpdateTerakhir = ''; c.targetDayaVA = ''; c.biayaPenyambungan = ''; c.foto = '';
-      c.diskon = ''; c.promo = '';
+      c.diskon = ''; c.promo = ''; c.dayaAwal = '';
       c.progresRow = null;
     }
     c.statusKey = statusKeyOf(c.statusProbing);
@@ -2177,8 +2184,16 @@ function computeDistances(c){
 
 function getTargetList(){
   customers.forEach(computeDistances);
+  // c.progresRow (baris "Progres Probing" sudah pernah tersimpan) TERMASUK di sini supaya
+  // pelanggan yang SUDAH PERNAH diprobing tidak "menghilang" begitu saja dari daftar kalau
+  // sinyal awalnya (c.srcJamNyala) belakangan jadi false — ini kejadian NORMAL setelah tambah
+  // daya beneran terpasang: begitu billing Paskabayar bulan berikutnya mencatat daya yang
+  // sudah naik, dayaStabil di computeTargetInfo() (daya bulan ini <= daya bulan lalu) jadi
+  // FALSE, jadi srcJamNyala ikut FALSE persis di saat status semestinya berubah ke
+  // Tersambung/Bayar. Tanpa c.progresRow di sini, pelanggan itu hilang dari Probing Lapangan &
+  // Dashboard tepat saat mau ditandai selesai — dan realisasinya jadi tidak pernah ikut terhitung.
   let list = customers.filter(c=>
-    (c.srcJamNyala || c.srcDibatalkan || c.srcDigital || (filters.manualIds && filters.manualIds.includes(c.idpel)))
+    (c.srcJamNyala || c.srcDibatalkan || c.srcDigital || c.progresRow || (filters.manualIds && filters.manualIds.includes(c.idpel)))
   );
   list = list.filter(c=>
     (filters.status==='all' || c.statusKey===filters.status) &&
@@ -3154,11 +3169,18 @@ async function saveVisitOutcome(idpel){
     // sebenarnya, bukan selalu tanggal hari ini.
     const tanggalInput = document.getElementById('vfTanggal').value;
     const tanggal = tanggalInput || todayStr();
+    // Daya Awal (VA) — dibekukan SEKALI di kunjungan pertama (pakai c.daya, daya yang berlaku
+    // SAAT INI, sebelum sempat berubah oleh billing bulan berikutnya). Kunjungan berikutnya
+    // untuk pelanggan yang sama harus tetap pakai nilai yang SUDAH tersimpan (c.dayaAwal), bukan
+    // c.daya lagi — kalau tidak, begitu daya sungguhan sudah naik (mis. setelah pemasangan),
+    // kunjungan susulan akan menimpanya dengan angka yang sudah baru, menghilangkan jejak
+    // daya sebelum naik yang justru dibutuhkan untuk menghitung realisasi (lihat renderDashboard()).
+    const dayaAwal = (c.dayaAwal!=null && c.dayaAwal!=='' && !isNaN(parseInt(c.dayaAwal,10))) ? c.dayaAwal : c.daya;
     const valueMap = {
       'IDPEL': idpel, 'Nama': c.name, 'Telepon': c.kontak1||'', 'Petugas': (APP_USER&&APP_USER.name)||'',
       'Status Probing': status, 'Tanggal Update Terakhir': tanggal, 'Catatan Terakhir': catatan,
       'Target Daya (VA)': targetDaya, 'Biaya Penyambungan (Rp)': biaya,
-      'Diskon (Rp)': diskon, 'Promo': promo,
+      'Diskon (Rp)': diskon, 'Promo': promo, 'Daya Awal (VA)': dayaAwal,
       'Latitude': myGps? myGps.lat : (isNaN(c.lat)?'':c.lat), 'Longitude': myGps? myGps.lng : (isNaN(c.lng)?'':c.lng),
       'Foto': fotoLink
     };
@@ -3167,8 +3189,8 @@ async function saveVisitOutcome(idpel){
     // "Diskon (Rp)" & "Promo" cuma benar-benar tersimpan kalau nama kolom itu sudah ada
     // persis di sheet "Progres Probing" — kalau header sheet belum punya kolom itu, nilainya
     // otomatis terlewat di baris di atas (bukan error, cuma tidak ada tempat menyimpannya).
-    if(!header.includes('Diskon (Rp)') || !header.includes('Promo')){
-      console.warn('Kolom "Diskon (Rp)" dan/atau "Promo" belum ada di sheet Progres Probing — nilainya belum tersimpan ke spreadsheet.');
+    if(!header.includes('Diskon (Rp)') || !header.includes('Promo') || !header.includes('Daya Awal (VA)')){
+      console.warn('Kolom "Diskon (Rp)", "Promo", dan/atau "Daya Awal (VA)" belum ada di sheet Progres Probing — nilainya belum tersimpan ke spreadsheet.');
     }
 
     if(c.progresRow){
@@ -3268,6 +3290,62 @@ async function backfillRiwayatProbing(){
       openLapanganDetail(activeIdpel);
       if(activeTab) switchDetailTab(activeTab);
     }
+  }catch(e){
+    console.error(e);
+    showMsg('err', 'Gagal: '+(e.message||String(e)));
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+// Perbaikan data lama — dipanggil manual lewat tombol "Perbaiki Daya Awal" di menu sidebar.
+// Kasusnya: kolom "Daya Awal (VA)" baru ditambahkan belakangan (lihat saveVisitOutcome()), jadi
+// pelanggan yang sudah pernah dicatat SEBELUM kolom ini ada belum punya nilainya — realisasi
+// tambah dayanya (di Dashboard) akan salah hitung tanpa itu. Fungsi ini mengisi "Daya Awal (VA)"
+// = c.daya (daya SAAT INI) untuk pelanggan yang statusnya BELUM "Selesai" (Bayar/Tersambung) —
+// sengaja dibatasi ke yang belum selesai saja, karena untuk yang itu c.daya MASIH bisa dipercaya
+// sebagai daya sebelum naik (belum sempat tertimpa billing pasca-pemasangan). Pelanggan yang
+// statusnya SUDAH "Selesai" dari sebelum kolom ini ada TIDAK bisa dibetulkan otomatis — daya
+// sebelum naiknya sudah tertimpa data billing terbaru dan tidak bisa dihitung ulang dari sini;
+// itu perlu diisi manual di sheet "Progres Probing" kalau datanya masih ada di catatan lain.
+async function backfillDayaAwal(){
+  const btn = document.getElementById('btnBackfillDayaAwal');
+  const msg = document.getElementById('backfillDayaAwalMsg');
+  const showMsg = (cls, text)=>{ if(!msg) return; msg.style.display='block'; msg.className='status-msg '+cls; msg.textContent = text; };
+
+  if(DEMO_MODE){
+    showMsg('err', 'Mode Demo tidak menyimpan ke Google Sheets sungguhan.');
+    return;
+  }
+
+  const colIdx = (SHEET_HEADERS.progres||[]).indexOf('Daya Awal (VA)');
+  if(colIdx===-1){
+    showMsg('err', 'Kolom "Daya Awal (VA)" belum ada di sheet "Progres Probing" — tambahkan dulu kolom itu (isi salah satu sel header-nya persis dengan teks itu), lalu coba lagi.');
+    return;
+  }
+
+  const missing = customers.filter(c=> c.progresRow && c.statusKey!=='selesai' && (c.dayaAwal==null || c.dayaAwal===''));
+  if(!missing.length){
+    showMsg('ok', 'Semua pelanggan yang sudah diprobing (belum Selesai) sudah punya Daya Awal. Tidak ada yang perlu diperbaiki.');
+    return;
+  }
+
+  if(btn) btn.disabled = true;
+  showMsg('', 'Memproses '+missing.length+' pelanggan…');
+  try{
+    let done = 0, failed = 0;
+    for(const c of missing){
+      try{
+        await sheetsUpdateCell(SHEET_NAMES.progres, c.progresRow, colIdx, c.daya);
+        c.dayaAwal = c.daya;
+        done++;
+      }catch(e){
+        console.warn('Gagal set Daya Awal untuk '+c.idpel+':', e);
+        failed++;
+      }
+    }
+    showMsg(failed? 'err' : 'ok', 'Selesai — '+done+' pelanggan diisi Daya Awal-nya'+(failed? ', '+failed+' gagal (coba lagi nanti).' : '.'));
+    renderDashboard();
   }catch(e){
     console.error(e);
     showMsg('err', 'Gagal: '+(e.message||String(e)));
@@ -3946,8 +4024,12 @@ function renderTrendChart(list){
   }
   const byMonth = {};
   selesaiList.forEach(c=>{
-    const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(c.daya) || c.daya;
-    const gainVA = Math.max(0, t - c.daya);
+    // Sama seperti renderDashboard(): pakai Daya Awal yang dibekukan, bukan c.daya yang bisa
+    // sudah ikut naik kalau billing-nya sudah sinkron — supaya angka tren ini tetap cocok
+    // dengan total di tile "Realisasi Tambah Daya".
+    const awal = parseInt(c.dayaAwal,10) || c.daya;
+    const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(awal) || awal;
+    const gainVA = Math.max(0, t - awal);
     const d = c.tanggalUpdateTerakhir;
     const key = (d && /^\d{4}-\d{2}-\d{2}$/.test(String(d).trim())) ? String(d).trim().slice(0,7) : '_unknown';
     byMonth[key] = (byMonth[key]||0) + gainVA;
@@ -4162,7 +4244,17 @@ function renderDashboard(){
   const realisasiBiaya = list.filter(c=>c.statusKey==='selesai')
     .reduce((sum,c)=> sum + Math.max(0, parseRupiah(c.biayaPenyambungan) - parseRupiah(c.diskon)), 0);
   const realisasiDaya = list.filter(c=>c.statusKey==='selesai')
-    .reduce((sum,c)=>{ const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(c.daya) || c.daya; return sum+Math.max(0, t-c.daya); },0);
+    // Daya AWAL dipakai di sini (c.dayaAwal, dibekukan saat kunjungan pertama — lihat
+    // saveVisitOutcome()), BUKAN c.daya (daya "saat ini"), karena c.daya ikut naik begitu
+    // billing Paskabayar bulan berikutnya sudah mencatat daya baru pasca pemasangan — kalau
+    // dipakai di sini, kenaikannya akan salah hitung jadi ~0 untuk pelanggan yang datanya
+    // sudah sinkron. Baris lama (sebelum kolom "Daya Awal (VA)" ada) fallback ke c.daya apa
+    // adanya — tidak bisa dibetulkan otomatis karena daya sebelum naiknya sudah tertimpa.
+    .reduce((sum,c)=>{
+      const awal = parseInt(c.dayaAwal,10) || c.daya;
+      const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(awal) || awal;
+      return sum+Math.max(0, t-awal);
+    },0);
   const potensiDaya = pipelineAktif
     .reduce((sum,c)=>{ const s = saranTargetDaya(c.daya); return s ? sum+(s-c.daya) : sum; },0);
   const potensiBiaya = pipelineAktif
