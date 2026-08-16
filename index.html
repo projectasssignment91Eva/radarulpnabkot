@@ -4015,12 +4015,20 @@ function renderProspekList(tipe){
       el.appendChild(div);
       return;
     }
+    // Tombol "Kirim WhatsApp" langsung dari daftar Prospek Tercatat — dipakai selagi ID
+    // Pelanggannya BELUM diketahui (jadi belum bisa lewat tab "Segmen WhatsApp" yang mensyaratkan
+    // kartu pelanggan/ID Pel). Nomornya diambil dari yang sudah dicatat di form Prospek Manual,
+    // bukan dari Data Identitas — jadi tersedia sejak prospek pertama kali dicatat, tidak perlu
+    // menunggu ID Pel-nya terisi. Pesan pembuka generik (bukan template kampanye "Segmen
+    // WhatsApp" yang butuh {daya}/{targetDaya} — data itu belum ada untuk prospek tanpa ID Pel).
+    const waHref = p['Telepon'] ? 'https://wa.me/'+waPhoneHref(p['Telepon'])+'?text='+encodeURIComponent('Halo '+(p['Nama']||'')+', saya dari PLN ULP Nabire Kota terkait minat Anda untuk tambah daya listrik. Bolehkah saya bantu prosesnya?') : '';
     const div = document.createElement('div');
     div.className = 'content-item';
     div.innerHTML = '<div class="ci-thumb'+(tipe==='sm'&&/whatsapp/i.test(p['Sumber']||'')?' wa':'')+'">'+(tipe==='be'?'EV':(/whatsapp/i.test(p['Sumber']||'')?'WA':'IG'))+'</div>'+
       '<div class="ci-info" style="flex:1;"><div class="ci-title">'+escapeHtml(p['Nama']||'')+(p['Telepon']?' · '+escapeHtml(p['Telepon']):'')+(p['Catatan']?' — '+escapeHtml(p['Catatan']):'')+'</div>'+
       '<div class="ci-sub">'+escapeHtml(p['Sumber']||'')+' · '+escapeHtml(String(p['Tanggal']||''))+(p['Petugas']?' · oleh '+escapeHtml(p['Petugas']):'')+
       (p['IDPEL']? ' · ID Pel '+escapeHtml(p['IDPEL']) : ' · <span class="prospek-idpel-missing">ID Pel belum diisi</span>')+'</div></div>'+
+      (waHref? '<a href="'+waHref+'" target="_blank" rel="noopener" class="prospek-edit-btn" aria-label="Kirim WhatsApp" title="Kirim WhatsApp"><span class="msr" aria-hidden="true">chat</span></a>' : '')+
       '<button class="prospek-edit-btn" aria-label="Edit prospek" onclick="toggleProspekEdit(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">edit</span></button>'+
       '<button class="prospek-edit-btn prospek-delete-btn" aria-label="Hapus prospek" onclick="deleteProspekManual(\''+tipe+'\', '+idx+')"><span class="msr" aria-hidden="true">delete</span></button>';
     el.appendChild(div);
