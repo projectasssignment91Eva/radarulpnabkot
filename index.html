@@ -1665,6 +1665,35 @@ async function handleFotoRumahLoadError(imgEl, fileId){
   }
 }
 
+// Menelusuri "Daya Awal" (daya SEBELUM naik) langsung dari riwayat tagihan Paskabayar asli
+// (c.usageHistory, sampai 12 periode terakhir, urut lama->baru — lihat buildCustomersFromSheets())
+// — bukan dari kolom yang diisi manual. Ini sumber paling bisa dipercaya karena murni dari data
+// billing PLN, tidak tergantung petugas sempat mencatat sebelum daya berubah atau tidak.
+// Caranya: telusuri MUNDUR dari periode terbaru, cari periode TERAKHIR yang daya-nya BEDA dari
+// daya sekarang (c.daya) — itu titik tepat sebelum lompatan ke daya sekarang terjadi.
+// Mengembalikan null kalau tidak ada perubahan daya sama sekali dalam 12 periode yang tersimpan
+// (mis. lompatannya terjadi lebih dari setahun lalu, di luar jangkauan riwayat yang disimpan).
+function derivedDayaAwal(c){
+  const hist = c.usageHistory;
+  if(!hist || !hist.length) return null;
+  for(let i=hist.length-1; i>=0; i--){
+    if(hist[i].daya !== c.daya) return hist[i].daya;
+  }
+  return null;
+}
+// Daya Awal definitif untuk satu pelanggan, urut dari yang paling bisa dipercaya: (1) ketahuan
+// langsung dari lompatan di riwayat billing asli, (2) dibekukan manual saat kunjungan pertama
+// (kolom "Daya Awal (VA)" di Progres Probing — lihat saveVisitOutcome()), (3) daya sekarang
+// sebagai upaya terakhir (bisa salah kalau billing-nya sudah sinkron duluan — lihat catatan di
+// renderDashboard()). Dipakai di renderDashboard() dan renderTrendChart() supaya kompak & konsisten.
+function resolvedDayaAwal(c){
+  const fromHistory = derivedDayaAwal(c);
+  if(fromHistory!=null) return fromHistory;
+  const fromColumn = parseInt(c.dayaAwal,10);
+  if(!isNaN(fromColumn) && c.dayaAwal!=null && c.dayaAwal!=='') return fromColumn;
+  return c.daya;
+}
+
 /* ---------------------------------------------------------------------
    5. BUSINESS LOGIC — porting mockup.html's computeTargetInfo() exactly
 --------------------------------------------------------------------- */
@@ -3336,8 +3365,11 @@ async function backfillDayaAwal(){
     let done = 0, failed = 0;
     for(const c of missing){
       try{
-        await sheetsUpdateCell(SHEET_NAMES.progres, c.progresRow, colIdx, c.daya);
-        c.dayaAwal = c.daya;
+        // Coba telusuri dari riwayat billing asli dulu (lebih akurat kalau daya-nya kebetulan
+        // sudah sempat berubah sebelum sempat diisi manual) — baru fallback ke c.daya.
+        const nilai = derivedDayaAwal(c) != null ? derivedDayaAwal(c) : c.daya;
+        await sheetsUpdateCell(SHEET_NAMES.progres, c.progresRow, colIdx, nilai);
+        c.dayaAwal = nilai;
         done++;
       }catch(e){
         console.warn('Gagal set Daya Awal untuk '+c.idpel+':', e);
@@ -4024,10 +4056,10 @@ function renderTrendChart(list){
   }
   const byMonth = {};
   selesaiList.forEach(c=>{
-    // Sama seperti renderDashboard(): pakai Daya Awal yang dibekukan, bukan c.daya yang bisa
-    // sudah ikut naik kalau billing-nya sudah sinkron — supaya angka tren ini tetap cocok
-    // dengan total di tile "Realisasi Tambah Daya".
-    const awal = parseInt(c.dayaAwal,10) || c.daya;
+    // Sama seperti renderDashboard(): pakai resolvedDayaAwal() (ditelusuri dari riwayat billing
+    // asli kalau bisa), bukan c.daya yang bisa sudah ikut naik kalau billing-nya sudah sinkron —
+    // supaya angka tren ini tetap cocok dengan total di tile "Realisasi Tambah Daya".
+    const awal = resolvedDayaAwal(c);
     const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(awal) || awal;
     const gainVA = Math.max(0, t - awal);
     const d = c.tanggalUpdateTerakhir;
@@ -4244,14 +4276,16 @@ function renderDashboard(){
   const realisasiBiaya = list.filter(c=>c.statusKey==='selesai')
     .reduce((sum,c)=> sum + Math.max(0, parseRupiah(c.biayaPenyambungan) - parseRupiah(c.diskon)), 0);
   const realisasiDaya = list.filter(c=>c.statusKey==='selesai')
-    // Daya AWAL dipakai di sini (c.dayaAwal, dibekukan saat kunjungan pertama — lihat
-    // saveVisitOutcome()), BUKAN c.daya (daya "saat ini"), karena c.daya ikut naik begitu
-    // billing Paskabayar bulan berikutnya sudah mencatat daya baru pasca pemasangan — kalau
-    // dipakai di sini, kenaikannya akan salah hitung jadi ~0 untuk pelanggan yang datanya
-    // sudah sinkron. Baris lama (sebelum kolom "Daya Awal (VA)" ada) fallback ke c.daya apa
-    // adanya — tidak bisa dibetulkan otomatis karena daya sebelum naiknya sudah tertimpa.
+    // Daya AWAL dipakai di sini lewat resolvedDayaAwal() — DITELUSURI DULU dari riwayat billing
+    // Paskabayar asli (derivedDayaAwal(): titik terakhir sebelum daya melompat ke nilai
+    // sekarang), baru fallback ke kolom "Daya Awal (VA)" yang dibekukan manual saat kunjungan
+    // pertama, baru fallback terakhir ke c.daya apa adanya. BUKAN langsung c.daya, karena c.daya
+    // ikut naik begitu billing Paskabayar bulan berikutnya sudah mencatat daya baru pasca
+    // pemasangan — kalau dipakai polos, kenaikannya salah kehitung ~0 untuk pelanggan yang
+    // datanya sudah sinkron (lihat percakapan soal SURATI & HERDA T.PAKAN yang lompatan
+    // dayanya masih ketahuan dari riwayat billing 12 periode terakhir).
     .reduce((sum,c)=>{
-      const awal = parseInt(c.dayaAwal,10) || c.daya;
+      const awal = resolvedDayaAwal(c);
       const t = parseInt(c.targetDayaVA,10) || saranTargetDaya(awal) || awal;
       return sum+Math.max(0, t-awal);
     },0);
