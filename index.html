@@ -459,9 +459,9 @@ table.trend-table tr:last-child td{ border-bottom:none; }
         <div class="hint">Dibuat lewat Google Cloud Console &gt; APIs &amp; Services &gt; Credentials &gt; OAuth Client ID (tipe Web application). Lihat panduan setup yang menyertai file ini.</div>
       </div>
       <div class="field">
-        <label>ID Folder Google Drive untuk Foto (opsional)</label>
-        <input id="cfgDriveFolder" placeholder="Bagian di URL folder Drive setelah /folders/">
-        <div class="hint">Kosongkan jika belum ada — foto akan diunggah ke folder utama Drive akun Anda.</div>
+        <label>ID Folder Google Drive "Foto Kunjungan" (foto saat probing lapangan)</label>
+        <input id="cfgDriveFolder" placeholder="1G41GOMM8eACq5wjI1mrp1pU0JkjqDLbg">
+        <div class="hint">Sudah terisi otomatis dengan folder "Foto Kunjungan" milik ULP Nabire Kota — foto yang diunggah lewat "Simpan Hasil Kunjungan" masuk ke sini, dinamai otomatis pakai ID Pelanggan. Ubah hanya jika folder sumbernya berbeda.</div>
       </div>
       <div class="field">
         <label>ID Folder Google Drive "Foto Paska" (foto rumah pelanggan)</label>
@@ -850,6 +850,11 @@ const CLIENT_ID_DEFAULT = '839176995145-k0kgmlu2hcpoj7b9k6dkbq37lbb2246r.apps.go
 // milik ULP Nabire Kota — dipakai sebagai default kalau field CFG.fotoPaskaFolder di Pengaturan
 // Lanjutan dikosongkan, supaya fitur sinkron foto rumah langsung jalan tanpa perlu diisi manual.
 const FOTO_PASKA_FOLDER_ID_DEFAULT = '12OlvZ9O-85NIQRgjSxquVBlpVSAXo_ZW';
+// Folder Drive "Foto Kunjungan" (foto yang diambil petugas saat probing lapangan, diunggah lewat
+// "Simpan Hasil Kunjungan") milik ULP Nabire Kota — dipakai sebagai default kalau field
+// CFG.driveFolder di Pengaturan Lanjutan dikosongkan, supaya foto kunjungan tidak jatuh ke folder
+// utama/root Drive akun yang sedang login (tidak rapi, bercampur file lain).
+const DRIVE_FOLDER_DEFAULT = '1G41GOMM8eACq5wjI1mrp1pU0JkjqDLbg';
 
 // Indeks file di folder "Foto Paska" (id + name), dimuat sekali tiap reloadAllData() lewat
 // loadFotoPaskaIndex(). Pencocokan ke pelanggan dilakukan lewat findFotoPaska(idpel) — mencari
@@ -907,7 +912,7 @@ function initApp(){
   // dengan CFG apa pun jalur masuknya (langsung ke app, atau ke layar login).
   document.getElementById('cfgSpreadsheetId').value = CFG.spreadsheetId || '';
   document.getElementById('cfgClientId').value = CFG.clientId || '';
-  document.getElementById('cfgDriveFolder').value = CFG.driveFolder || '';
+  document.getElementById('cfgDriveFolder').value = CFG.driveFolder || DRIVE_FOLDER_DEFAULT;
   document.getElementById('cfgFotoPaskaFolder').value = CFG.fotoPaskaFolder || FOTO_PASKA_FOLDER_ID_DEFAULT;
   document.getElementById('cfgKantor').value = (CFG.kantorLat!=null && CFG.kantorLng!=null) ? (CFG.kantorLat+', '+CFG.kantorLng) : '';
 
@@ -1093,7 +1098,7 @@ function backToSetup(){
   hideAllGates();
   document.getElementById('cfgSpreadsheetId').value = CFG.spreadsheetId || '';
   document.getElementById('cfgClientId').value = CFG.clientId || '';
-  document.getElementById('cfgDriveFolder').value = CFG.driveFolder || '';
+  document.getElementById('cfgDriveFolder').value = CFG.driveFolder || DRIVE_FOLDER_DEFAULT;
   document.getElementById('cfgFotoPaskaFolder').value = CFG.fotoPaskaFolder || FOTO_PASKA_FOLDER_ID_DEFAULT;
   document.getElementById('cfgKantor').value = (CFG.kantorLat!=null && CFG.kantorLng!=null) ? (CFG.kantorLat+', '+CFG.kantorLng) : '';
   renderBiayaTanggaFields();
@@ -3435,7 +3440,8 @@ async function uploadFileToDrive(file, folderId, filename){
 }
 async function uploadPhotoToDrive(file, idpel){
   const filename = 'RADAR_'+idpel+'_'+Date.now()+'_'+file.name;
-  const result = await uploadFileToDrive(file, CFG.driveFolder, filename);
+  const folderId = (CFG.driveFolder||'').trim() || DRIVE_FOLDER_DEFAULT;
+  const result = await uploadFileToDrive(file, folderId, filename);
   return result.url;
 }
 function fileToBase64(file){
