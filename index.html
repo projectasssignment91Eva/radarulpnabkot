@@ -128,6 +128,9 @@ h1,h2,h3,h4{ font-weight:var(--fw-heading); margin:0; }
 .icon-btn{ border:none; background:transparent; font-size:18px; padding:8px; border-radius:10px; color:var(--text-secondary); display:inline-flex; align-items:center; justify-content:center; }
 .icon-btn:hover{ background:var(--page); }
 .demo-banner{ background:#fff4d6; color:#7a5b00; font-size:12.5px; text-align:center; padding:6px 10px; border-bottom:1px solid #f0dca0; }
+.schema-warning-banner{ background:#fdeaea; color:#8a2323; font-size:12px; padding:8px 36px 8px 12px; border-bottom:1px solid #f3bcbc; position:relative; line-height:1.5; }
+.schema-warning-banner b{ display:block; margin-bottom:2px; }
+.schema-warning-banner .swb-close{ position:absolute; top:6px; right:8px; background:none; border:none; color:#8a2323; cursor:pointer; font-size:16px; line-height:1; padding:4px; }
 
 @media (max-width:860px){
   .sidebar{ transform:translateX(-100%); }
@@ -535,6 +538,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
         <span class="user-pill" id="userPill"></span>
       </div>
       <div class="demo-banner" id="demoBanner" style="display:none;">Mode Demo — menampilkan data contoh, bukan data pelanggan asli.</div>
+      <div class="schema-warning-banner" id="schemaWarningBanner" style="display:none;"></div>
 
   <!-- ---------------- MAPPING TARGET ---------------- -->
   <div class="screen active" id="screen-mapping">
@@ -1299,8 +1303,10 @@ async function reloadAllData(){
       biayaTanggaSheetMissing = false;
       riwayatWaList = buildDemoRiwayatWa();
       riwayatWaSheetMissing = false;
+      renderSchemaWarningBanner(null); // Mode Demo tidak punya sheet sungguhan untuk divalidasi
     } else {
       const [sheets] = await Promise.all([ fetchAllSheets(), loadFotoPaskaIndex() ]);
+      renderSchemaWarningBanner(validateSheetSchemas());
       customers = buildCustomersFromSheets(sheets);
       prospekList = sheets.prospek || [];
       riwayatWaList = sheets.riwayatWa || [];
@@ -1415,16 +1421,14 @@ function silentRefreshToken(){
   });
   return tokenRefreshPromise;
 }
-// Pembungkus fetch dipakai SEMUA helper Sheets API di bawah — otomatis menyisipkan header
-// Authorization, dan kalau responsnya 401, coba sekali refresh diam-diam lalu ulangi
-// permintaannya sebelum benar-benar dianggap gagal. Ini supaya sesi yang kedaluwarsa di tengah
-// petugas mengisi form tidak langsung menggagalkan penyimpanan dan tidak menghapus isian yang
-// sudah diketik (form-nya tetap utuh di layar, cuma permintaan simpannya yang diulang di
-// belakang layar). Kalau refresh diam-diam juga gagal (mis. sesi Google di browser ini SENDIRI
-// sudah berakhir, bukan cuma token akses RADAR-nya), baru tampilkan pesan yang jelas.
-async function sheetsFetch(url, options){
-  options = options || {};
-  options.headers = Object.assign({}, options.headers, { Authorization:'Bearer '+ACCESS_TOKEN });
+function sleepMs(ms){ return new Promise(resolve=> setTimeout(resolve, ms)); }
+
+// Satu kali percobaan request — menyisipkan header Authorization dan menangani 401 (coba sekali
+// refresh token diam-diam lalu ulangi permintaannya) SEKALI SAJA. Retry untuk kegagalan sementara
+// (jaringan putus, 429, 5xx) ditangani satu lapis di luar, oleh sheetsFetch() di bawah — dipisah
+// supaya kegagalan sesi (401 yang tidak bisa direfresh) TIDAK ikut diulang-ulang sia-sia (ditandai
+// err.noRetry = true, lihat sheetsFetch()).
+async function sheetsFetchOnce(url, options){
   let res = await fetch(url, options);
   if(res.status===401){
     const refreshed = await silentRefreshToken();
@@ -1432,11 +1436,42 @@ async function sheetsFetch(url, options){
       options.headers = Object.assign({}, options.headers, { Authorization:'Bearer '+ACCESS_TOKEN });
       res = await fetch(url, options);
     }
-  }
-  if(res.status===401){
-    throw new Error('Sesi Google kedaluwarsa dan tidak bisa diperbarui otomatis. Isian yang sedang diketik TIDAK hilang — buka menu di pojok kiri atas, tekan "Keluar", masuk kembali dengan Google, lalu kembali ke sini dan tekan Simpan lagi.');
+    if(res.status===401){
+      const err = new Error('Sesi Google kedaluwarsa dan tidak bisa diperbarui otomatis. Isian yang sedang diketik TIDAK hilang — buka menu di pojok kiri atas, tekan "Keluar", masuk kembali dengan Google, lalu kembali ke sini dan tekan Simpan lagi.');
+      err.noRetry = true;
+      throw err;
+    }
   }
   return res;
+}
+const SHEETS_RETRY_MAX = 3;
+// Pembungkus fetch dipakai SEMUA helper Sheets API di bawah. Selain menangani 401 (lewat
+// sheetsFetchOnce() di atas), sekarang JUGA otomatis mengulang (retry, dengan jeda yang makin
+// panjang / exponential backoff: ~0.8s, 1.6s, 3.2s) kalau kegagalannya SEMENTARA — koneksi
+// terputus sesaat, atau Google membalas 429 (kena batas jumlah permintaan, mis. banyak petugas
+// muat data bersamaan) atau 5xx (server Google sedang bermasalah sesaat). TIDAK diulang untuk
+// error yang tidak akan membaik dengan diulang (403 tidak punya akses, 400 permintaan salah,
+// sesi 401 yang gagal direfresh) — itu tetap langsung dilempar ke pemanggil seperti biasa.
+// Penting untuk petugas lapangan yang sering di area sinyal lemah — sebelumnya satu kali gagal
+// jaringan langsung menggagalkan seluruh pemuatan data atau penyimpanan hasil kunjungan.
+async function sheetsFetch(url, options){
+  options = options || {};
+  options.headers = Object.assign({}, options.headers, { Authorization:'Bearer '+ACCESS_TOKEN });
+  for(let attempt=0; ; attempt++){
+    let res;
+    try{
+      res = await sheetsFetchOnce(url, options);
+    }catch(err){
+      if(err.noRetry || attempt>=SHEETS_RETRY_MAX) throw err;
+      await sleepMs(800*Math.pow(2,attempt));
+      continue;
+    }
+    if((res.status===429 || res.status>=500) && attempt<SHEETS_RETRY_MAX){
+      await sleepMs(800*Math.pow(2,attempt));
+      continue;
+    }
+    return res;
+  }
 }
 
 async function sheetsGet(range){
@@ -1509,6 +1544,47 @@ function rowsToObjects(rows){
     items.push(obj);
   }
   return { header, items };
+}
+
+// Kolom yang WAJIB ADA persis (case-sensitive, sesuai header baris pertama sheet) supaya sheet
+// itu bisa dibaca RADAR dengan benar. IDPEL wajib di semua sheet wajib (kunci penggabung data);
+// Paskabayar juga butuh DAYA & JAMNYALA karena itu dasar perhitungan target/realisasi.
+// Dipakai oleh validateSheetSchemas() di bawah — SATU-satunya tujuannya supaya kesalahan nama
+// kolom (yang beberapa kali terjadi hari ini: "METER" vs "NOMOR METER", folder ID salah, dst)
+// langsung kelihatan sebagai peringatan jelas ke admin, BUKAN diam-diam menghasilkan 0 pelanggan
+// target tanpa penjelasan (seperti kasus SURATI & HERDA T.PAKAN sebelum RADAR menelusuri
+// riwayat billing — lihat resolvedDayaAwal()).
+const REQUIRED_SHEET_COLUMNS = {
+  identitas: ['IDPEL'],
+  pasca: ['IDPEL','DAYA','JAMNYALA'],
+  pra: ['IDPEL'],
+  batal: ['IDPEL'],
+  progres: ['IDPEL'],
+  updateDaya: ['IDPEL']
+};
+// Dipanggil dari reloadAllData() (mode sungguhan saja) SETELAH fetchAllSheets() berhasil mengisi
+// SHEET_HEADERS untuk tiap sheet — mengembalikan daftar pesan peringatan (kosong kalau semua
+// kolom wajib ada). Sengaja TIDAK menggagalkan pemuatan data (kolom yang tidak wajib mungkin
+// masih terbaca sebagian) — cuma memberi tahu admin apa yang perlu dibetulkan di spreadsheet.
+function validateSheetSchemas(){
+  const problems = [];
+  Object.keys(REQUIRED_SHEET_COLUMNS).forEach(key=>{
+    const header = SHEET_HEADERS[key] || [];
+    const missing = REQUIRED_SHEET_COLUMNS[key].filter(col=> !header.includes(col));
+    if(missing.length){
+      problems.push('Sheet "'+SHEET_NAMES[key]+'": kolom '+missing.map(m=>'"'+m+'"').join(', ')+' tidak ditemukan — periksa ejaannya persis di baris pertama (header) sheet itu.');
+    }
+  });
+  return problems;
+}
+function renderSchemaWarningBanner(problems){
+  const el = document.getElementById('schemaWarningBanner');
+  if(!el) return;
+  if(!problems || !problems.length){ el.style.display = 'none'; el.innerHTML=''; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<b>Ada masalah dengan struktur spreadsheet — sebagian data mungkin tidak terbaca:</b>'+
+    problems.map(p=>escapeHtml(p)).join('<br>')+
+    '<button type="button" class="swb-close" aria-label="Tutup" onclick="document.getElementById(\'schemaWarningBanner\').style.display=\'none\';">✕</button>';
 }
 
 async function fetchAllSheets(){
@@ -2896,23 +2972,23 @@ function openLapanganDetail(idpel){
         '<div class="form-block">'+
           '<div class="section-title" style="margin-top:0;">Catat Hasil Kunjungan</div>'+
           '<label>Status Probing</label>'+
-          '<select id="vfStatus">'+STATUS_OPTIONS.map(s=>'<option value="'+s+'"'+(c.statusProbing===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
+          '<select id="vfStatus" onchange="saveDraftKunjungan(\''+idpel+'\')">'+STATUS_OPTIONS.map(s=>'<option value="'+s+'"'+(c.statusProbing===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
           '<label>Tanggal Kunjungan</label>'+
-          '<input id="vfTanggal" type="date" value="'+escapeAttr(validDateOrToday(c.tanggalUpdateTerakhir))+'" max="'+todayStr()+'">'+
+          '<input id="vfTanggal" type="date" value="'+escapeAttr(validDateOrToday(c.tanggalUpdateTerakhir))+'" max="'+todayStr()+'" oninput="saveDraftKunjungan(\''+idpel+'\')">'+
           '<div class="field-hint">Kalau ini catatan kunjungan lama (dari luar aplikasi), ubah tanggalnya sesuai kapan pelanggan benar-benar diprobing.</div>'+
           '<label>Catatan</label>'+
-          '<textarea id="vfCatatan" rows="3" placeholder="Catatan hasil kunjungan…">'+escapeHtml(c.catatanTerakhir||'')+'</textarea>'+
+          '<textarea id="vfCatatan" rows="3" placeholder="Catatan hasil kunjungan…" oninput="saveDraftKunjungan(\''+idpel+'\')">'+escapeHtml(c.catatanTerakhir||'')+'</textarea>'+
           '<label>Target Daya (VA)</label>'+
           '<select id="vfTargetDaya" onchange="onTargetDayaChange(\''+idpel+'\')">'+
             (targetOptions.length ? targetOptions.map(t=>'<option value="'+t+'"'+(String(currentTarget)===String(t)?' selected':'')+'>'+t+' VA</option>').join('') : '<option value="">(tidak ada tingkat lebih tinggi)</option>')+
           '</select>'+
           '<label>Biaya Penyambungan (Rp)</label>'+
-          '<input id="vfBiaya" type="text" inputmode="numeric" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi" oninput="updateBiayaBersihHint()">'+
+          '<input id="vfBiaya" type="text" inputmode="numeric" value="'+escapeAttr(c.biayaPenyambungan || (estimasiBiaya!=null ? estimasiBiaya : ''))+'" placeholder="Diisi setelah survei/realisasi" oninput="updateBiayaBersihHint();saveDraftKunjungan(\''+idpel+'\')">'+
           (!c.biayaPenyambungan && estimasiBiaya!=null ? '<div class="field-hint" style="margin-top:-10px;">Terisi otomatis dari tabel tangga biaya di Pengaturan sesuai Target Daya di atas — sesuaikan setelah biaya sebenarnya diketahui.</div>' : '')+
           '<label>Diskon (Rp)</label>'+
-          '<input id="vfDiskon" type="text" inputmode="numeric" value="'+escapeAttr(c.diskon||'')+'" placeholder="0 (kosongkan kalau tidak ada)" oninput="updateBiayaBersihHint()">'+
+          '<input id="vfDiskon" type="text" inputmode="numeric" value="'+escapeAttr(c.diskon||'')+'" placeholder="0 (kosongkan kalau tidak ada)" oninput="updateBiayaBersihHint();saveDraftKunjungan(\''+idpel+'\')">'+
           '<label>Promo / Program Tematik</label>'+
-          '<input id="vfPromo" type="text" value="'+escapeAttr(c.promo||'')+'" placeholder="mis. Promo HUT PLN Agustus 2026">'+
+          '<input id="vfPromo" type="text" value="'+escapeAttr(c.promo||'')+'" placeholder="mis. Promo HUT PLN Agustus 2026" oninput="saveDraftKunjungan(\''+idpel+'\')">'+
           '<div class="field-hint" id="vfBiayaBersihHint" style="display:'+(parseRupiah(c.diskon)>0?'':'none')+';">'+(parseRupiah(c.diskon)>0?('Setelah diskon: '+formatRupiah(biayaBersih)):'')+'</div>'+
           '<button class="save-btn" id="vfSaveBtn" onclick="saveVisitOutcome(\''+idpel+'\')">Simpan Hasil Kunjungan</button>'+
           '<div class="status-msg" id="vfMsg"></div>'+
@@ -2973,6 +3049,8 @@ function openLapanganDetail(idpel){
         buildRiwayatProbingTimeline(c.riwayatProbing||[])+
       '</div>'+
     '</div>';
+
+  applyDraftKunjunganIfAny(idpel);
 }
 // Edit inline nomor telepon (Kontak 1) langsung dari kartu detail Probing Lapangan — dipakai
 // untuk memperbarui nomor yang salah/berubah tanpa harus lewat tab WhatsApp di Probing Digital.
@@ -3137,6 +3215,7 @@ function onTargetDayaChange(idpel){
   const biayaInput = document.getElementById('vfBiaya');
   if(biayaInput) biayaInput.value = est!=null ? est : '';
   updateBiayaBersihHint();
+  saveDraftKunjungan(idpel);
 }
 // Dipanggil tiap kali field Biaya Penyambungan atau Diskon diketik ulang — supaya
 // petugas langsung lihat berapa yang benar-benar diterima setelah dipotong diskon,
@@ -3174,6 +3253,51 @@ function closeLapanganDetail(){
   document.getElementById('lapanganListView').style.display = 'block';
   document.getElementById('lapanganDetailView').style.display = 'none';
   renderLapanganList();
+}
+
+/* ---------------------------------------------------------------------
+   12b. DRAF "CATAT HASIL KUNJUNGAN" — jaring pengaman lokal (localStorage, per IDPEL) supaya
+   isian form tidak hilang percuma kalau sinyal terputus atau HP force-close SEBELUM sempat
+   menekan "Simpan Hasil Kunjungan" — kejadian nyata untuk petugas lapangan di area sinyal
+   lemah. BUKAN sinkron antar perangkat (murni lokal di browser/HP yang dipakai mengisi),
+   dan TIDAK menyimpan foto yang dipilih (file gambar terlalu besar untuk localStorage) —
+   cuma field teks/angka/tanggal/status. Dihapus otomatis begitu Simpan berhasil.
+--------------------------------------------------------------------- */
+const DRAFT_KEY_PREFIX = 'radar_draft_';
+function saveDraftKunjungan(idpel){
+  const val = id=> { const el = document.getElementById(id); return el ? el.value : ''; };
+  const draft = {
+    status: val('vfStatus'), tanggal: val('vfTanggal'), catatan: val('vfCatatan'),
+    targetDaya: val('vfTargetDaya'), biaya: val('vfBiaya'), diskon: val('vfDiskon'), promo: val('vfPromo'),
+    savedAt: Date.now()
+  };
+  try{ localStorage.setItem(DRAFT_KEY_PREFIX+idpel, JSON.stringify(draft)); }catch(e){ /* localStorage penuh/nonaktif — draf cuma tidak tersimpan, tidak fatal */ }
+}
+function loadDraftKunjungan(idpel){
+  try{ const raw = localStorage.getItem(DRAFT_KEY_PREFIX+idpel); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+function clearDraftKunjungan(idpel){
+  try{ localStorage.removeItem(DRAFT_KEY_PREFIX+idpel); }catch(e){}
+}
+// Dipanggil dari openLapanganDetail() SETELAH form dirender dengan data tersimpan (c.*) —
+// menimpa field-fieldnya dengan draf lokal kalau ada, dan menampilkan pemberitahuan supaya
+// petugas sadar yang sedang dilihat adalah isian yang BELUM tersimpan ke Google Sheets.
+function applyDraftKunjunganIfAny(idpel){
+  const draft = loadDraftKunjungan(idpel);
+  if(!draft) return;
+  const setVal = (id, v)=>{ const el = document.getElementById(id); if(el && v!=null) el.value = v; };
+  setVal('vfStatus', draft.status); setVal('vfTanggal', draft.tanggal); setVal('vfCatatan', draft.catatan);
+  setVal('vfTargetDaya', draft.targetDaya); setVal('vfBiaya', draft.biaya); setVal('vfDiskon', draft.diskon); setVal('vfPromo', draft.promo);
+  updateBiayaBersihHint();
+  const msgEl = document.getElementById('vfMsg');
+  if(msgEl){
+    msgEl.className = 'status-msg';
+    msgEl.innerHTML = '<span class="msr" aria-hidden="true" style="font-size:14px;vertical-align:-2px;">history</span> Draf yang belum tersimpan dipulihkan (diketik '+new Date(draft.savedAt).toLocaleString('id-ID')+') — <a href="#" onclick="discardDraftKunjungan(\''+escapeAttr(idpel)+'\');return false;">buang draf &amp; pakai data tersimpan</a>.';
+  }
+}
+function discardDraftKunjungan(idpel){
+  clearDraftKunjungan(idpel);
+  if(activeIdpel===idpel) openLapanganDetail(idpel);
 }
 
 /* ---------------------------------------------------------------------
@@ -3265,6 +3389,7 @@ async function saveVisitOutcome(idpel){
     c.targetDayaVA = targetDaya; c.biayaPenyambungan = biaya; c.diskon = diskon; c.promo = promo; c.foto = fotoLink;
     c.petugasProbing = (APP_USER&&APP_USER.name)||'';
     c.statusKey = statusKeyOf(status);
+    clearDraftKunjungan(idpel); // sudah tersimpan permanen ke Sheets — draf lokal tidak perlu lagi
 
     msg.className = 'status-msg ok';
     msg.textContent = 'Tersimpan ke Progres Probing.'+((!header.includes('Diskon (Rp)') || !header.includes('Promo')) ? ' (Kolom Diskon/Promo belum ada di sheet — lihat catatan di bawah.)' : '');
