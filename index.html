@@ -554,6 +554,11 @@ table.trend-table tr:last-child td{ border-bottom:none; }
           <button class="apply-btn" style="flex:0 0 auto; background:#fff; color:var(--pln-navy); border:1.5px solid var(--pln-navy); display:inline-flex; align-items:center; gap:6px; justify-content:center;" onclick="toggleRouteMode()" id="routeModeBtn"><span class="msr" aria-hidden="true">route</span> Buat Rute</button>
           <button class="apply-btn" style="flex:0 0 auto; background:#fff; color:var(--pln-navy); border:1.5px solid var(--pln-navy); display:inline-flex; align-items:center; gap:6px; justify-content:center;" onclick="toggleManualGpsMode()" id="manualGpsBtn" title="Kalau titik &quot;Lokasi Anda&quot; di peta meleset jauh, tekan ini lalu klik titik yang benar di peta"><span class="msr" aria-hidden="true">edit_location_alt</span> Perbaiki Lokasi</button>
         </div>
+        <div class="search-box">
+          <span class="msr" aria-hidden="true">search</span>
+          <input type="text" id="mappingSearchInput" placeholder="Cari nama jalan/alamat, nama, ID pelanggan, atau nomor meter…" oninput="onMappingSearchInput(this.value)">
+          <button type="button" class="search-clear" id="mappingSearchClear" style="display:none;" aria-label="Hapus pencarian" onclick="document.getElementById('mappingSearchInput').value=''; onMappingSearchInput('');"><span class="msr" aria-hidden="true">close</span></button>
+        </div>
         <div id="gpsStatusNote" class="status-msg" style="display:none;text-align:left;margin:0 0 8px;"></div>
         <div id="routeInfo" class="route-info-box" style="display:none;"></div>
         <div id="mappingCount" class="route-note" style="margin-bottom:8px;"></div>
@@ -574,7 +579,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       </div>
       <div class="search-box">
         <span class="msr" aria-hidden="true">search</span>
-        <input type="text" id="lapanganSearchInput" placeholder="Cari nama, ID pelanggan, atau nomor meter…" oninput="onLapanganSearchInput(this.value)">
+        <input type="text" id="lapanganSearchInput" placeholder="Cari nama, ID pelanggan, nomor meter, atau alamat/jalan…" oninput="onLapanganSearchInput(this.value)">
         <button type="button" class="search-clear" id="lapanganSearchClear" style="display:none;" aria-label="Hapus pencarian" onclick="document.getElementById('lapanganSearchInput').value=''; onLapanganSearchInput('');"><span class="msr" aria-hidden="true">close</span></button>
       </div>
       <div id="lapanganCount" class="route-note"></div>
@@ -784,6 +789,14 @@ let mapMarkers = [];
 let myGps = null;             // {lat,lng} from navigator.geolocation (atau dikoreksi manual lewat toggleManualGpsMode())
 let myGpsAccuracy = null;     // radius akurasi dari browser (meter) — null kalau titiknya hasil koreksi manual (dianggap akurat oleh petugas sendiri)
 let manualGpsMode = false;    // true = klik berikutnya di peta akan dipakai sebagai titik "Lokasi Anda" (koreksi manual)
+// Lacak lokasi terus-menerus (lihat startGpsWatch()) — dipakai supaya titik "Lokasi Anda" & jarak
+// ke target ikut mengikuti petugas selagi bergerak (mis. naik mobil), bukan cuma sekali dideteksi
+// lalu diam. gpsWatchId dari navigator.geolocation.watchPosition() — null kalau belum/tidak aktif.
+let gpsWatchId = null;
+let lastGpsRenderAt = 0;      // timestamp render ulang peta/daftar TERAKHIR akibat update GPS live
+let lastGpsRenderPos = null;  // {lat,lng} posisi SAAT render ulang terakhir itu — buat cek sudah bergeser berapa jauh
+const GPS_WATCH_MIN_INTERVAL_MS = 8000; // jangan render ulang lebih sering dari ini walau GPS terus mengirim update
+const GPS_WATCH_MIN_MOVE_M = 40;        // ATAU render ulang lebih cepat kalau sudah bergeser sejauh ini (meter)
 let startPoint = 'gps';       // 'gps' | 'office'
 let routeMode = false;        // true = urutkan & gambar rute kunjungan terdekat->terjauh di peta
 let routeLine = null;         // Leaflet polyline rute (garis terang) saat ini — dihapus & digambar ulang tiap render
@@ -792,6 +805,7 @@ let routeLineHalo = null;     // garis "bayangan" gelap di bawah routeLine, supa
 let filters = { status:'all', priority:[], daya:[], kogol:[], tarif:[], sumberTarget:[], petugas:'all', manualIds:null, jamNyalaMin:null };
 let lapanganMode = 'today';
 let lapanganSearchQuery = ''; // isian kolom cari (nama/IDPEL) di tab Probing Lapangan
+let mappingSearchQuery = ''; // isian kolom cari (nama/alamat/jalan) di tab Mapping Target
 let todaysPlan = [];          // idpel list, in Mapping Target order
 let activeIdpel = null;       // currently open detail record in Probing Lapangan
 let teleponEditing = null;    // idpel yang nomor teleponnya sedang diedit inline di kartu detail
@@ -1248,14 +1262,27 @@ async function startApp(){
 // kegagalan ditampilkan lewat #gpsStatusNote (di atas peta Mapping Target) dengan pesan yang
 // sesuai penyebabnya, supaya petugas tahu harus berbuat apa (izinkan akses lokasi di browser,
 // cari sinyal GPS lebih baik, atau coba tekan "Dari Lokasi Saya" lagi).
+//
+// SEBELUMNYA fungsi ini cuma getCurrentPosition() sekali (satu titik, lalu diam selamanya) —
+// itu sebabnya titik "Lokasi Anda" & jarak ke target tidak pernah bergerak lagi begitu petugas
+// pindah tempat (mis. sedang naik mobil menuju lokasi lain). Sekarang pakai watchPosition(),
+// yang terus mengirim posisi terbaru selama izin lokasi aktif — myGps ikut bergerak otomatis.
+// Render ulang peta/daftar (updateMapPins()+renderMappingList(), lumayan berat: re-fitBounds,
+// gambar ulang semua pin) DIBATASI (throttle) supaya tidak dipanggil berkali-kali per detik
+// selagi GPS terus mengirim update — cuma render ulang tiap minimal GPS_WATCH_MIN_INTERVAL_MS,
+// ATAU lebih cepat kalau sudah bergeser lebih dari GPS_WATCH_MIN_MOVE_M (mana yang lebih dulu).
 function requestGeolocation(){
+  startGpsWatch();
+}
+function startGpsWatch(){
   const note = document.getElementById('gpsStatusNote');
   const showNote = (text)=>{ if(note){ note.style.display='block'; note.className='status-msg err'; note.textContent=text; } };
   if(!navigator.geolocation){
     showNote('Perangkat/browser ini tidak mendukung deteksi lokasi otomatis. Jarak & rute tetap bisa dihitung dari Kantor ULP (isi koordinatnya di Pengaturan).');
     return;
   }
-  navigator.geolocation.getCurrentPosition(
+  if(gpsWatchId!=null) return; // sudah aktif, tidak perlu mendaftar watch baru
+  gpsWatchId = navigator.geolocation.watchPosition(
     pos=>{
       myGps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       myGpsAccuracy = pos.coords.accuracy || null;
@@ -1274,7 +1301,15 @@ function requestGeolocation(){
           note.style.display = 'none';
         }
       }
-      renderMappingList();
+      const now = Date.now();
+      const movedEnoughM = lastGpsRenderPos
+        ? haversineKm(lastGpsRenderPos.lat, lastGpsRenderPos.lng, myGps.lat, myGps.lng) * 1000
+        : Infinity;
+      if(now - lastGpsRenderAt >= GPS_WATCH_MIN_INTERVAL_MS || movedEnoughM >= GPS_WATCH_MIN_MOVE_M){
+        lastGpsRenderAt = now;
+        lastGpsRenderPos = { lat: myGps.lat, lng: myGps.lng };
+        renderMappingList();
+      }
     },
     err=>{
       if(err && err.code===1){
@@ -1282,11 +1317,21 @@ function requestGeolocation(){
       } else if(err && err.code===2){
         showNote('Lokasi tidak dapat dideteksi (sinyal GPS lemah/tidak ada). Coba lagi di tempat terbuka, atau pakai "Dari Kantor" sementara.');
       } else {
-        showNote('Deteksi lokasi kehabisan waktu. Tekan tombol "Dari Lokasi Saya" untuk mencoba lagi.');
+        showNote('Deteksi lokasi kehabisan waktu/gagal sesaat. Sedang mencoba lagi otomatis — kalau masih gagal setelah beberapa saat, tekan tombol "Dari Lokasi Saya" untuk mengulang dari awal.');
       }
     },
-    { enableHighAccuracy:true, timeout:8000 }
+    { enableHighAccuracy:true, timeout:15000, maximumAge:5000 }
   );
+}
+// Menghentikan lacak lokasi terus-menerus — dipanggil saat petugas sengaja tidak lagi butuh
+// posisi live (ganti ke "Dari Kantor", atau mau koreksi manual lewat "Perbaiki Lokasi" supaya
+// koreksinya tidak langsung tertimpa update GPS berikutnya). Kalau kembali pilih "Dari Lokasi
+// Saya", startGpsWatch() dipanggil ulang dan lacak jalan lagi dari situ.
+function stopGpsWatch(){
+  if(gpsWatchId!=null && navigator.geolocation){
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
 }
 
 async function reloadAllData(){
@@ -2483,9 +2528,12 @@ function updateMapPins(list){
 // laptop/komputer tanpa GPS asli) meleset jauh dari posisi sebenarnya (lihat catatan akurasi di
 // requestGeolocation()). Begitu diaktifkan, klik BERIKUTNYA di peta dipakai sebagai titik
 // "Lokasi Anda" yang baru — menimpa hasil deteksi otomatis sampai deteksi ulang/muat ulang
-// halaman berikutnya.
+// halaman berikutnya. Lacak GPS live (startGpsWatch()) DIHENTIKAN begitu mode ini aktif — kalau
+// dibiarkan jalan, update GPS berikutnya bisa langsung menimpa lagi koreksi manual yang baru saja
+// diklik, sebelum sempat kelihatan hasilnya.
 function toggleManualGpsMode(){
   manualGpsMode = !manualGpsMode;
+  if(manualGpsMode) stopGpsWatch();
   const btn = document.getElementById('manualGpsBtn');
   if(btn){
     btn.style.background = manualGpsMode ? 'var(--pln-navy)' : '#fff';
@@ -2504,7 +2552,9 @@ function toggleManualGpsMode(){
 function toggleStartPoint(){
   startPoint = startPoint==='gps' ? 'office' : 'gps';
   document.getElementById('startPointBtn').innerHTML = startPoint==='gps' ? '<span class="msr" aria-hidden="true">near_me</span> Dari Lokasi Saya' : '<span class="msr" aria-hidden="true">apartment</span> Dari Kantor';
-  if(startPoint==='gps' && !myGps) requestGeolocation();
+  // "Dari Lokasi Saya" = lacak posisi terus-menerus (lihat startGpsWatch()); pindah ke "Dari
+  // Kantor" tidak butuh itu lagi — dihentikan supaya tidak menguras baterai/data GPS percuma.
+  if(startPoint==='gps') startGpsWatch(); else stopGpsWatch();
   renderMappingList();
 }
 function toggleRouteMode(){
@@ -2540,6 +2590,15 @@ function buildRouteMapsLink(start, list){
   return { url:'https://www.google.com/maps/dir/'+capped.map(encodeURIComponent).join('/'), truncated: pts.length>10, totalPoints: pts.length };
 }
 
+// Kolom cari di atas peta Mapping Target — cocokkan ke Nama, IDPEL, Nomor Meter, ATAU
+// Alamat/nama jalan, tidak peka huruf besar/kecil. Dipakai a.l. supaya petugas yang sedang di
+// jalan bisa langsung ketik nama jalan itu dan lihat pelanggan target mana saja di sekitar sana.
+function onMappingSearchInput(value){
+  mappingSearchQuery = (value||'').trim().toLowerCase();
+  const clearBtn = document.getElementById('mappingSearchClear');
+  if(clearBtn) clearBtn.style.display = mappingSearchQuery ? 'flex' : 'none';
+  renderMappingList();
+}
 function renderMappingList(){
   const fullList = getTargetList();
   // Mapping Target ini untuk pelanggan yang MASIH perlu ditindaklanjuti — kalau Status
@@ -2548,16 +2607,31 @@ function renderMappingList(){
   // yang masih aktif. Kalau user secara sengaja memilih status tertentu (termasuk "Selesai"
   // atau "Ditolak") di Filter Lanjutan, tampilkan persis sesuai pilihan itu — tidak dipaksa
   // sembunyi lagi, karena itu artinya user memang mau melihatnya.
-  const list = filters.status==='all'
+  let list = filters.status==='all'
     ? fullList.filter(c=>c.statusKey!=='selesai' && c.statusKey!=='ditolak')
     : fullList;
   const hiddenCount = fullList.length - list.length;
+  // Cari nama jalan/alamat (atau nama/ID/nomor meter) — dipakai a.l. supaya petugas yang lagi
+  // di jalan bisa langsung ketik nama jalannya dan lihat siapa saja target di sekitar situ,
+  // tanpa perlu menyisir satu-satu di peta. Diterapkan SETELAH filter status di atas, dan
+  // sebelum dihitung/digambar — jadi hitungan & rute (Mode Rute) ikut menyesuaikan pencarian.
+  const beforeSearchCount = list.length;
+  if(mappingSearchQuery){
+    list = list.filter(c=>
+      (c.name && c.name.toLowerCase().includes(mappingSearchQuery)) ||
+      (c.idpel && String(c.idpel).toLowerCase().includes(mappingSearchQuery)) ||
+      (c.nomorMeter && String(c.nomorMeter).toLowerCase().includes(mappingSearchQuery)) ||
+      (c.addr && c.addr.toLowerCase().includes(mappingSearchQuery))
+    );
+  }
   updateMapPins(list);
   const countEl = document.getElementById('mappingCount');
-  if(countEl) countEl.textContent = (routeMode
-    ? list.length+' pelanggan target sesuai filter · urut rute terdekat → terjauh dari '+(startPoint==='gps'?'lokasi Anda':'kantor')
-    : list.length+' pelanggan target sesuai filter · urut Prioritas → daya terkecil → jarak terdekat')
-    + (hiddenCount>0 ? ' · '+hiddenCount+' pelanggan Selesai/Ditolak disembunyikan (pilih Status Probing di Filter Lanjutan untuk melihatnya)' : '');
+  if(countEl) countEl.textContent = mappingSearchQuery
+    ? list.length+' dari '+beforeSearchCount+' pelanggan cocok dengan pencarian "'+mappingSearchQuery+'"'
+    : (routeMode
+        ? list.length+' pelanggan target sesuai filter · urut rute terdekat → terjauh dari '+(startPoint==='gps'?'lokasi Anda':'kantor')
+        : list.length+' pelanggan target sesuai filter · urut Prioritas → daya terkecil → jarak terdekat')
+      + (hiddenCount>0 ? ' · '+hiddenCount+' pelanggan Selesai/Ditolak disembunyikan (pilih Status Probing di Filter Lanjutan untuk melihatnya)' : '');
 
   const routeInfoEl = document.getElementById('routeInfo');
   if(routeInfoEl){
@@ -2586,7 +2660,9 @@ function renderMappingList(){
   if(!wrap) return;
   wrap.innerHTML = '';
   if(list.length===0){
-    wrap.innerHTML = '<div class="empty-note">Tidak ada pelanggan yang cocok dengan filter ini.</div>';
+    wrap.innerHTML = mappingSearchQuery
+      ? '<div class="empty-note">Tidak ada pelanggan dengan nama/ID/nomor meter/alamat yang cocok dengan pencarian ini.</div>'
+      : '<div class="empty-note">Tidak ada pelanggan yang cocok dengan filter ini.</div>';
     return;
   }
   list.forEach((c,idx)=>{
@@ -2835,7 +2911,8 @@ function renderLapanganList(){
     list = list.filter(c=>
       (c.name && c.name.toLowerCase().includes(lapanganSearchQuery)) ||
       (c.idpel && String(c.idpel).toLowerCase().includes(lapanganSearchQuery)) ||
-      (c.nomorMeter && String(c.nomorMeter).toLowerCase().includes(lapanganSearchQuery))
+      (c.nomorMeter && String(c.nomorMeter).toLowerCase().includes(lapanganSearchQuery)) ||
+      (c.addr && c.addr.toLowerCase().includes(lapanganSearchQuery))
     );
     if(countEl) countEl.textContent = list.length+' dari '+totalBeforeSearch+' pelanggan cocok dengan pencarian "'+lapanganSearchQuery+'"';
   }
