@@ -574,7 +574,7 @@ table.trend-table tr:last-child td{ border-bottom:none; }
       </div>
       <div class="search-box">
         <span class="msr" aria-hidden="true">search</span>
-        <input type="text" id="lapanganSearchInput" placeholder="Cari nama atau ID pelanggan…" oninput="onLapanganSearchInput(this.value)">
+        <input type="text" id="lapanganSearchInput" placeholder="Cari nama, ID pelanggan, atau nomor meter…" oninput="onLapanganSearchInput(this.value)">
         <button type="button" class="search-clear" id="lapanganSearchClear" style="display:none;" aria-label="Hapus pencarian" onclick="document.getElementById('lapanganSearchInput').value=''; onLapanganSearchInput('');"><span class="msr" aria-hidden="true">close</span></button>
       </div>
       <div id="lapanganCount" class="route-note"></div>
@@ -2795,9 +2795,9 @@ function setLapanganMode(mode, btn){
   btn.classList.add('active');
   renderLapanganList();
 }
-// Kolom cari di atas daftar Probing Lapangan — cocokkan ke Nama ATAU IDPEL, tidak peka
-// huruf besar/kecil, dan tidak mempedulikan tab "Kunjungan Hari Ini"/"Semua Target" mana
-// yang sedang aktif (renderLapanganList() menerapkan pencarian ini di atas daftar yang
+// Kolom cari di atas daftar Probing Lapangan — cocokkan ke Nama, IDPEL, ATAU Nomor Meter,
+// tidak peka huruf besar/kecil, dan tidak mempedulikan tab "Kunjungan Hari Ini"/"Semua Target"
+// mana yang sedang aktif (renderLapanganList() menerapkan pencarian ini di atas daftar yang
 // sudah difilter mode+Filter Lanjutan).
 function onLapanganSearchInput(value){
   lapanganSearchQuery = (value||'').trim().toLowerCase();
@@ -2834,14 +2834,15 @@ function renderLapanganList(){
   if(lapanganSearchQuery){
     list = list.filter(c=>
       (c.name && c.name.toLowerCase().includes(lapanganSearchQuery)) ||
-      (c.idpel && String(c.idpel).toLowerCase().includes(lapanganSearchQuery))
+      (c.idpel && String(c.idpel).toLowerCase().includes(lapanganSearchQuery)) ||
+      (c.nomorMeter && String(c.nomorMeter).toLowerCase().includes(lapanganSearchQuery))
     );
     if(countEl) countEl.textContent = list.length+' dari '+totalBeforeSearch+' pelanggan cocok dengan pencarian "'+lapanganSearchQuery+'"';
   }
 
   if(list.length===0){
     wrap.innerHTML = lapanganSearchQuery
-      ? '<div class="empty-note">Tidak ada pelanggan dengan nama/ID yang cocok dengan pencarian ini.</div>'
+      ? '<div class="empty-note">Tidak ada pelanggan dengan nama/ID/nomor meter yang cocok dengan pencarian ini.</div>'
       : '<div class="empty-note">Belum ada rencana kunjungan. Atur target dan filternya dulu di tab Mapping Target.</div>';
     return;
   }
